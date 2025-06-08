@@ -50,6 +50,25 @@
       background: rgba(255, 255, 255, 0.6);
     }
 
+    .active {
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    .spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      border-top: 4px solid #333;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
     #feedFilter {
       width: 100%;
       padding: 6px 8px;
@@ -149,6 +168,12 @@
     .reader {
       max-height: 70vh;
       overflow: auto;
+      color: inherit;
+    }
+
+    .reader * {
+      color: inherit !important;
+      background: transparent !important;
     }
 
     #opml {
@@ -174,6 +199,15 @@
         background: rgba(255, 255, 255, 0.2);
       }
 
+      .active {
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      .spinner {
+        border-color: rgba(255, 255, 255, 0.2);
+        border-top-color: #bbb;
+      }
+
       .article {
         background: rgba(40, 40, 40, 0.6);
       }
@@ -194,6 +228,74 @@
         background: rgba(0, 0, 0, 0.4);
       }
     }
+
+    body[data-theme='light'] {
+      background: linear-gradient(135deg, #dfe9f3, #ffffff);
+      color: #000;
+    }
+
+    body[data-theme='light'] #app {
+      background: rgba(255, 255, 255, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.45);
+    }
+
+    body[data-theme='light'] button {
+      background: rgba(255, 255, 255, 0.4);
+    }
+
+    body[data-theme='light'] button:hover {
+      background: rgba(255, 255, 255, 0.6);
+    }
+
+    body[data-theme='light'] .article {
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    body[data-theme='light'] .modal {
+      background: rgba(255, 255, 255, 0.65);
+    }
+
+    body[data-theme='light'] .modal-content {
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    body[data-theme='dark'] {
+      background: linear-gradient(135deg, #2c2f33, #1e2124);
+      color: #eee;
+    }
+
+    body[data-theme='dark'] #app {
+      background: rgba(40, 40, 40, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    body[data-theme='dark'] button {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    body[data-theme='dark'] button:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    body[data-theme='dark'] .article {
+      background: rgba(40, 40, 40, 0.6);
+    }
+
+    body[data-theme='dark'] .edit-feed {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    body[data-theme='dark'] .modal {
+      background: rgba(0, 0, 0, 0.65);
+    }
+
+    body[data-theme='dark'] .modal-content {
+      background: rgba(50, 50, 50, 0.9);
+    }
+
+    body[data-theme='dark'] #readerBar {
+      background: rgba(0, 0, 0, 0.4);
+    }
   </style>
 </head>
 <body>
@@ -203,7 +305,10 @@
       <button id="addFeeds">Upload OPML</button>
       <input type="text" id="feedFilter" placeholder="Filter feeds" />
       <div id="feeds"></div>
-      <button id="allFeeds">All Recent</button>
+      <div style="display:flex;gap:6px;margin-top:4px;">
+        <button id="allFeeds">All Recent</button>
+        <button id="refreshAll" title="Refresh">⟳</button>
+      </div>
       <button id="settingsBtn">Settings</button>
     </div>
     <div id="main">
@@ -225,6 +330,7 @@
   <div class="modal" id="settingsModal">
     <div class="modal-content" id="settingsContent"></div>
   </div>
+  <script src="utils/buildTimeline.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>
