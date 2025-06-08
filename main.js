@@ -151,13 +151,13 @@ ipcMain.handle('fetch-feed', async (_e, url) => {
 ipcMain.handle('fetch-podcast', async (_e, url) => {
   try {
     const feed = await parser.parseURL(url);
-    const feedImage = feed.itunesImage || feed.image?.url || '';
+    const feedImage = (feed.itunesImage?.href || feed.itunesImage) || feed.image?.url || '';
     const items = feed.items
       .map(i => ({
         title: i.title,
         link: i.link,
         audio: i.enclosure?.url,
-        image: i.itunesImage || i.image || feedImage,
+        image: (i.itunesImage?.href || i.itunesImage) || i.image || feedImage,
         transcript: i.transcript || '',
         isoDate: i.isoDate,
         pubDate: i.pubDate
@@ -176,6 +176,18 @@ ipcMain.handle('search-podcasts', async (_e, term) => {
     );
     const json = await res.json();
     return json.results.map(r => ({ title: r.collectionName, feedUrl: r.feedUrl }));
+  } catch {
+    return [];
+  }
+});
+
+ipcMain.handle('search-feeds', async (_e, term) => {
+  try {
+    const res = await fetch(
+      `https://cloud.feedly.com/v3/search/feeds?query=${encodeURIComponent(term)}&count=5`
+    );
+    const json = await res.json();
+    return (json.results || []).map(r => ({ title: r.title, url: r.feedId.replace(/^feed\//, '') }));
   } catch {
     return [];
   }

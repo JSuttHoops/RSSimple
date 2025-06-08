@@ -206,6 +206,12 @@
       font-size: 12px;
     }
 
+    #tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
     #readerBar {
       position: absolute;
       bottom: 10px;
@@ -244,13 +250,33 @@
     }
 
     #audioContent {
-      max-width: 400px;
+      max-width: 600px;
       text-align: center;
     }
 
     #audioContent img {
-      max-width: 100%;
+      width: 100%;
+      border-radius: 8px;
       margin-bottom: 8px;
+    }
+
+    #audioContent audio {
+      width: 100%;
+    }
+
+    #audioContent .player-nav {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+    }
+
+    #audioContent .transcript {
+      text-align: left;
+      max-height: 300px;
+      overflow: auto;
+      font-size: 14px;
+      line-height: 1.4;
+      margin-top: 8px;
     }
 
     #settingsContent {
@@ -471,12 +497,15 @@
         <button id="addPodcast">Add Podcast</button>
         <div id="podcastFeeds"></div>
       </div>
-      <button id="podcastLib">Podcasts</button>
-      <button id="newsLib">News Library</button>
-      <button id="settingsBtn">Settings</button>
     </div>
     <div id="main">
       <h1>RSSimple</h1>
+      <div id="tabs">
+        <button id="podcastLib">Podcasts</button>
+        <button id="newsLib">News Library</button>
+        <button id="exploreBtn">Explore</button>
+        <button id="settingsBtn">Settings</button>
+      </div>
       <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center;">
         <input type="text" id="searchInput" placeholder="Search" style="flex:1" />
         <select id="rangeSelect">

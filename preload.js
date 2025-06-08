@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('api', {
   fetchFeed: (url) => ipcRenderer.invoke('fetch-feed', url),
   fetchPodcast: (url) => ipcRenderer.invoke('fetch-podcast', url),
   searchPodcasts: (term) => ipcRenderer.invoke('search-podcasts', term),
+  searchFeeds: (term) => ipcRenderer.invoke('search-feeds', term),
   importOpml: (file) => ipcRenderer.invoke('import-opml', file),
   downloadArticle: (info) => ipcRenderer.invoke('download-article', info),
   downloadEpisode: (info) => ipcRenderer.invoke('download-episode', info),
