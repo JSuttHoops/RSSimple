@@ -118,6 +118,12 @@
       white-space: nowrap;
     }
 
+    .fav-feed {
+      background: none;
+      font-size: 18px;
+      padding: 0 4px;
+    }
+
     .edit-feed,
     .del-feed {
       width: 32px;
@@ -156,6 +162,12 @@
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
+    }
+
+    .feed-label {
+      font-size: 12px;
+      opacity: 0.7;
+      margin-top: 4px;
     }
 
     #newsLibrary {
@@ -229,6 +241,16 @@
       max-height: 90vh;
       overflow: auto;
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    #audioContent {
+      max-width: 400px;
+      text-align: center;
+    }
+
+    #audioContent img {
+      max-width: 100%;
+      margin-bottom: 8px;
     }
 
     #settingsContent {
@@ -441,6 +463,7 @@
         <div style="display:flex;gap:6px;margin-top:4px;">
           <button id="allFeeds">All Recent</button>
           <button id="favoritesBtn">Favorites</button>
+          <button id="favFeedsBtn">Favorite Feeds</button>
           <button id="refreshAll" title="Refresh">⟳</button>
         </div>
       </div>
@@ -474,6 +497,7 @@
     <div class="modal-content" id="modalContent"></div>
     <div id="readerBar">
       <button id="toggleReader">Reader Mode</button>
+      <button id="webMode">Web Mode</button>
       <select id="fontSelect">
         <option value="sans-serif">Sans</option>
         <option value="serif">Serif</option>
@@ -486,6 +510,9 @@
   </div>
   <div class="modal" id="dialogModal">
     <div class="modal-content" id="dialogContent"></div>
+  </div>
+  <div class="modal" id="audioModal">
+    <div class="modal-content" id="audioContent"></div>
   </div>
   <script src="utils/buildTimeline.js"></script>
   <script src="renderer.js"></script>

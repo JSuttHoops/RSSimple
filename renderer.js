@@ -6,6 +6,7 @@ const filterInput = document.getElementById('feedFilter');
 const feedDropdown = document.getElementById('feedDropdown');
 const articlesDiv = document.getElementById('articles');
 const favoritesBtn = document.getElementById('favoritesBtn');
+const favFeedsBtn = document.getElementById('favFeedsBtn');
 const searchInput = document.getElementById('searchInput');
 const rangeSelect = document.getElementById('rangeSelect');
 const sinceDate = document.getElementById('sinceDate');
@@ -13,6 +14,7 @@ const modal = document.getElementById('modal');
 const modalContent = document.getElementById('modalContent');
 const readerBar = document.getElementById('readerBar');
 const toggleReader = document.getElementById('toggleReader');
+const webModeBtn = document.getElementById('webMode');
 const fontSelect = document.getElementById('fontSelect');
 const bgColor = document.getElementById('bgColor');
 const allFeedsBtn = document.getElementById('allFeeds');
@@ -29,10 +31,13 @@ const podcastFeedsDiv = document.getElementById('podcastFeeds');
 const episodesDiv = document.getElementById('episodes');
 const newsSearch = document.getElementById('newsSearch');
 const newsLibraryDiv = document.getElementById('newsLibrary');
+const audioModal = document.getElementById('audioModal');
+const audioContent = document.getElementById('audioContent');
 const rssControls = document.getElementById('rssControls');
 const podcastControls = document.getElementById('podcastControls');
 allFeedsBtn.dataset.feed = '*';
 favoritesBtn.dataset.feed = 'favorites';
+favFeedsBtn.dataset.feed = 'favfeeds';
 readerBar.onclick = (e) => e.stopPropagation();
 
 let state = {
@@ -40,12 +45,14 @@ let state = {
   articles: {},
   feedWeights: {},
   favorites: [],
+  favoriteFeeds: [],
   prefs: {},
   podcasts: [],
   episodes: {}
 };
 let filterText = '';
 let readerMode = false;
+let webViewMode = false;
 let searchText = '';
 let rangeDays = 7;
 let currentFeed = '*';
@@ -110,6 +117,13 @@ function renderFeeds() {
     const title = feed.title || url;
     const row = document.createElement('div');
     row.className = 'feed-row';
+    const star = document.createElement('button');
+    star.className = 'fav-feed';
+    star.textContent = state.favoriteFeeds.includes(url) ? '★' : '☆';
+    star.onclick = (e) => {
+      e.stopPropagation();
+      toggleFeedFavorite(url, star);
+    };
     const btn = document.createElement('button');
     btn.textContent = title;
     btn.dataset.feed = url;
@@ -138,6 +152,7 @@ function renderFeeds() {
         renderFeeds();
       }
     };
+    row.appendChild(star);
     row.appendChild(btn);
     row.appendChild(edit);
     row.appendChild(del);
@@ -301,6 +316,12 @@ function renderArticles(articles) {
     const title = document.createElement('div');
     title.innerHTML = `<strong>${a.title}</strong>`;
     div.appendChild(title);
+    if (a.feedTitle) {
+      const source = document.createElement('div');
+      source.className = 'feed-label';
+      source.textContent = a.feedTitle;
+      div.appendChild(source);
+    }
     if (a.summary) {
       const summary = document.createElement('div');
       summary.className = 'summary';
@@ -361,7 +382,10 @@ async function showArticle(a) {
   modalContent.innerHTML =
     `<h2>${a.title}</h2>` +
     imgPart +
-    `<div class="reader" data-raw="" data-link="${a.link}"></div>`;
+    `<div class="reader" data-raw="" data-link="${a.link}"></div>` +
+    `<div id="webContainer" style="display:none;width:100%;height:80vh;">
+       <iframe src="" style="width:100%;height:100%;border:0"></iframe>
+     </div>`;
   const readerDiv = modalContent.querySelector('.reader');
   readerDiv.dataset.raw = content;
   readerDiv.innerHTML = content;
@@ -374,6 +398,10 @@ async function showArticle(a) {
   };
   modalContent.onclick = (e) => e.stopPropagation();
   readerMode = !!parsed;
+  webViewMode = false;
+  const iframe = modalContent.querySelector('#webContainer iframe');
+  iframe.src = a.link;
+  modalContent.querySelector('#webContainer').style.display = 'none';
 }
 
 function textColorFor(hex) {
@@ -449,6 +477,19 @@ toggleReader.onclick = async () => {
   }
 };
 
+webModeBtn.onclick = () => {
+  webViewMode = !webViewMode;
+  const readerDiv = modalContent.querySelector('.reader');
+  const webDiv = modalContent.querySelector('#webContainer');
+  if (webViewMode) {
+    webDiv.style.display = 'block';
+    readerDiv.style.display = 'none';
+  } else {
+    webDiv.style.display = 'none';
+    readerDiv.style.display = 'block';
+  }
+};
+
 async function downloadArticle(a) {
   const file = await window.api.downloadArticle({ url: a.link, title: a.title });
   alert(`Saved to ${file}`);
@@ -462,8 +503,7 @@ async function downloadEpisode(ep) {
 let audioPlayer = null;
 function playEpisode(ep) {
   if (audioPlayer) audioPlayer.pause();
-  audioPlayer = new Audio(ep.audio);
-  audioPlayer.play();
+  showAudioPlayer(ep);
 }
 
 function isFavorite(link) {
@@ -480,6 +520,44 @@ async function toggleFavorite(a, btn) {
     btn.textContent = '★';
   }
   window.api.saveData(state);
+}
+
+function isFavoriteFeed(url) {
+  return state.favoriteFeeds.includes(url);
+}
+
+function toggleFeedFavorite(url, btn) {
+  if (isFavoriteFeed(url)) {
+    state.favoriteFeeds = state.favoriteFeeds.filter(f => f !== url);
+    btn.textContent = '☆';
+  } else {
+    state.favoriteFeeds.push(url);
+    btn.textContent = '★';
+  }
+  window.api.saveData(state);
+}
+
+function showAudioPlayer(ep) {
+  audioContent.innerHTML = '';
+  if (ep.image) {
+    const img = document.createElement('img');
+    img.src = ep.image;
+    audioContent.appendChild(img);
+  }
+  const audio = document.createElement('audio');
+  audio.controls = true;
+  audio.src = ep.audio;
+  audio.autoplay = true;
+  audioContent.appendChild(audio);
+  audioModal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  audioModal.onclick = () => {
+    audioModal.style.display = 'none';
+    document.body.style.overflow = '';
+    audio.pause();
+  };
+  audioContent.onclick = (e) => e.stopPropagation();
+  audioPlayer = audio;
 }
 
 async function fetchOgImage(url) {
@@ -693,6 +771,7 @@ opmlInput.onchange = async () => {
   state.articles = data.articles || {};
   state.feedWeights = data.feedWeights || {};
   state.favorites = data.favorites || [];
+  state.favoriteFeeds = data.favoriteFeeds || [];
   state.prefs = data.prefs || {};
   state.podcasts = data.podcasts || [];
   state.episodes = data.episodes || {};
@@ -752,6 +831,17 @@ favoritesBtn.onclick = () => {
   currentArticles = state.favorites;
   updateArticleDisplay();
   setActiveFeedButton('favorites');
+};
+
+favFeedsBtn.onclick = async () => {
+  if (!state.favoriteFeeds.length) return;
+  articlesDiv.innerHTML = '<div class="spinner"></div>';
+  const list = state.feeds.filter(f => state.favoriteFeeds.includes(f.url || f));
+  const { timeline } = await window.buildTimeline(list, fetchAny);
+  currentFeed = 'favfeeds';
+  currentArticles = timeline;
+  setActiveFeedButton('favfeeds');
+  updateArticleDisplay();
 };
 
 settingsBtn.onclick = () => {
