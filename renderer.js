@@ -850,8 +850,21 @@ async function fetchOgImage(url) {
     try {
       const res = await fetch(url);
       const html = await res.text();
-      const m = html.match(/<meta[^>]+property=['"]og:image['"][^>]+content=['"]([^'"]+)['"]/i);
-      return m ? m[1] : null;
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const selectors = [
+        'meta[property="og:image"]',
+        'meta[name="og:image"]',
+        'meta[property="og:image:secure_url"]',
+        'meta[property="twitter:image"]',
+        'meta[name="twitter:image"]',
+        'meta[property="twitter:image:src"]',
+        'meta[name="twitter:image:src"]'
+      ];
+      for (const sel of selectors) {
+        const el = doc.querySelector(sel);
+        if (el && el.getAttribute('content')) return el.getAttribute('content');
+      }
+      return null;
     } catch {
       return null;
     }
@@ -871,10 +884,15 @@ function fetchAny(url, controller) {
   if (url.startsWith('bsky:')) {
     return window.api.fetchBluesky(url.slice(5));
   }
-  return fetch(url, { signal: ctrl.signal }).then(res => {
-    if (!res.ok) throw new Error(res.statusText);
-    return res.text();
-  }).then(parseXML);
+  if (/^https?:/.test(url)) {
+    return window.api.fetchFeed(url);
+  }
+  return fetch(url, { signal: ctrl.signal })
+    .then(res => {
+      if (!res.ok) throw new Error(res.statusText);
+      return res.text();
+    })
+    .then(parseXML);
 }
 
 async function prefetchAll() {
