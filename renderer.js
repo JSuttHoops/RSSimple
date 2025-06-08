@@ -37,9 +37,17 @@ function renderArticles(articles) {
 }
 
 function showArticle(a) {
-  modalContent.innerHTML = `<h2>${a.title}</h2>${a.image ? `<img src="${a.image}" style="max-width:100%;margin-bottom:8px;"/>` : ''}<p><a href="${a.link}" target="_blank">Open Link</a></p>`;
+  const imgPart = a.image
+    ? `<img src="${a.image}" style="max-width:100%;margin-bottom:8px;"/>`
+    : '';
+  modalContent.innerHTML =
+    `<h2>${a.title}</h2>` +
+    imgPart +
+    `<p><a href="${a.link}" target="_blank">Open Link</a></p>`;
   modal.style.display = 'flex';
-  modal.onclick = () => { modal.style.display = 'none'; };
+  modal.onclick = () => {
+    modal.style.display = 'none';
+  };
 }
 
 async function loadArticles(url) {
