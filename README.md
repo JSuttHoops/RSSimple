@@ -23,6 +23,7 @@ Now includes a sidebar feed list with filtering and editable feed names.
 - Local JSON storage of feeds and articles so your subscriptions persist between runs.
 - Sidebar with feed filtering.
 - Edit feed titles inline.
+- Feed names wrap automatically so long titles aren't cut off.
 - Delete feeds with the ✖ button.
 - Add new feeds manually.
 - Dropdown to quickly switch between feeds.
