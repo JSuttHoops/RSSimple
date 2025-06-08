@@ -8,11 +8,22 @@ const USER_DIR = app.getPath('userData');
 const DATA_FILE = path.join(USER_DIR, 'data.json');
 const FEED_DIR = path.join(USER_DIR, 'feeds');
 const OPML_FILE = path.join(FEED_DIR, 'feeds.opml');
+const OFFLINE_DIR = path.join(USER_DIR, 'offline');
 
 function ensureFeedDir() {
   if (!fs.existsSync(FEED_DIR)) {
     fs.mkdirSync(FEED_DIR, { recursive: true });
   }
+}
+
+function ensureOfflineDir() {
+  if (!fs.existsSync(OFFLINE_DIR)) {
+    fs.mkdirSync(OFFLINE_DIR, { recursive: true });
+  }
+}
+
+function sanitize(name) {
+  return name.replace(/[^a-z0-9_\-]+/gi, '_').slice(0, 50);
 }
 
 function parseOPML(filePath) {
@@ -29,7 +40,12 @@ function parseOPML(filePath) {
         return arr;
       }
       if (typeof node === 'object') {
-        if (node['@_xmlUrl']) arr.push(node['@_xmlUrl']);
+        if (node['@_xmlUrl']) {
+          arr.push({
+            url: node['@_xmlUrl'],
+            title: node['@_title'] || node['@_text'] || node['@_xmlUrl']
+          });
+        }
         if (node.outline) arr = arr.concat(collect(node.outline));
       }
       return arr;
@@ -44,14 +60,18 @@ function loadData() {
   try {
     const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     if (data.feeds.length === 0 && fs.existsSync(OPML_FILE)) {
-      data.feeds = Array.from(new Set(parseOPML(OPML_FILE)));
+      const parsed = parseOPML(OPML_FILE);
+      const map = new Map(parsed.map(f => [f.url, f]));
+      data.feeds = Array.from(map.values());
       saveData(data);
     }
     return data;
   } catch (e) {
     const empty = { feeds: [], articles: [] };
     if (fs.existsSync(OPML_FILE)) {
-      empty.feeds = Array.from(new Set(parseOPML(OPML_FILE)));
+      const parsed = parseOPML(OPML_FILE);
+      const map = new Map(parsed.map(f => [f.url, f]));
+      empty.feeds = Array.from(map.values());
       saveData(empty);
     }
     return empty;
@@ -76,6 +96,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   ensureFeedDir();
+  ensureOfflineDir();
   createWindow();
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -92,22 +113,35 @@ ipcMain.handle('save-data', (_e, data) => saveData(data));
 
 ipcMain.handle('fetch-feed', async (_e, url) => {
   const feed = await parser.parseURL(url);
-  return feed.items.map(i => ({
+  const items = feed.items.map(i => ({
     title: i.title,
     link: i.link,
     image: i.enclosure?.url ||
            (i['media:content'] && i['media:content'].url) ||
            (i['media:thumbnail'] && i['media:thumbnail'].url) ||
-           (i.content && (i.content.match(/<img[^>]+src=\"([^\"]+)\"/) || [])[1])
+           (i.content && (i.content.match(/<img[^>]+src=\"([^\"]+)\"/) || [])[1]),
+    summary: i.contentSnippet || i.summary || '',
+    content: i['content:encoded'] || i.content || ''
   }));
+  return { feedTitle: feed.title, items };
 });
 
 ipcMain.handle('import-opml', async (_e, filePath) => {
   ensureFeedDir();
   fs.copyFileSync(filePath, OPML_FILE);
-  const urls = parseOPML(OPML_FILE);
+  const feeds = parseOPML(OPML_FILE);
   const data = loadData();
-  data.feeds = Array.from(new Set(urls));
+  const map = new Map(feeds.map(f => [f.url, f]));
+  data.feeds = Array.from(map.values());
   saveData(data);
   return data;
+});
+
+ipcMain.handle('download-article', async (_e, { url, title }) => {
+  ensureOfflineDir();
+  const res = await fetch(url);
+  const html = await res.text();
+  const file = path.join(OFFLINE_DIR, sanitize(title) + '.html');
+  fs.writeFileSync(file, html);
+  return file;
 });
