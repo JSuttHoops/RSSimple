@@ -122,19 +122,20 @@ function renderFeeds() {
     const row = document.createElement('div');
     row.className = 'feed-row';
     const star = document.createElement('button');
-    star.className = 'fav-feed';
+    star.className = 'fav-feed feed-btn';
     star.textContent = state.favoriteFeeds.includes(url) ? '★' : '☆';
     star.onclick = (e) => {
       e.stopPropagation();
       toggleFeedFavorite(url, star);
     };
     const btn = document.createElement('button');
+    btn.className = 'feed-btn btn';
     btn.textContent = title;
     btn.dataset.feed = url;
     btn.onclick = () => loadArticles(url);
     const edit = document.createElement('button');
     edit.textContent = '✎';
-    edit.className = 'edit-feed';
+    edit.className = 'edit-feed feed-btn btn';
     edit.onclick = (e) => {
       e.stopPropagation();
       const val = prompt('Feed Name', title);
@@ -146,7 +147,7 @@ function renderFeeds() {
     };
     const del = document.createElement('button');
     del.textContent = '✖';
-    del.className = 'del-feed';
+    del.className = 'del-feed feed-btn btn';
     del.onclick = (e) => {
       e.stopPropagation();
       if (confirm('Remove feed?')) {
@@ -163,11 +164,17 @@ function renderFeeds() {
     feedsDiv.appendChild(row);
   });
   if (feedDropdown) {
-    feedDropdown.innerHTML =
-      `<option value="*">All Recent</option>` +
-      state.feeds
-        .map(f => `<option value="${f.url}">${f.title || f.url}</option>`)
-        .join('');
+    feedDropdown.innerHTML = '';
+    const allOpt = document.createElement('option');
+    allOpt.value = '*';
+    allOpt.textContent = 'All Recent';
+    feedDropdown.appendChild(allOpt);
+    state.feeds.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f.url;
+      opt.textContent = f.title || f.url;
+      feedDropdown.appendChild(opt);
+    });
   }
   renderNewsLibrary();
 }
@@ -187,11 +194,12 @@ function renderPodcasts() {
       row.appendChild(img);
     }
     const btn = document.createElement('button');
+    btn.className = 'feed-btn btn';
     btn.textContent = p.title || p.url;
     btn.onclick = () => loadEpisodes(p.url);
     const imgBtn = document.createElement('button');
     imgBtn.textContent = '✎';
-    imgBtn.className = 'img-btn';
+    imgBtn.className = 'img-btn feed-btn';
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -210,7 +218,7 @@ function renderPodcasts() {
     };
     const artBtn = document.createElement('button');
     artBtn.textContent = 'Add';
-    artBtn.className = 'img-btn';
+    artBtn.className = 'img-btn feed-btn btn';
     const artInput = document.createElement('input');
     artInput.type = 'file';
     artInput.accept = '.png,.jpg,.jpeg';
@@ -232,7 +240,7 @@ function renderPodcasts() {
     };
     const del = document.createElement('button');
     del.textContent = '✖';
-    del.className = 'del-feed';
+    del.className = 'del-feed feed-btn btn';
     del.onclick = (e) => {
       e.stopPropagation();
       if (confirm('Remove podcast?')) {
@@ -277,7 +285,7 @@ function renderNewsLibrary() {
     }
     const imgBtn = document.createElement('button');
     imgBtn.textContent = '✎';
-    imgBtn.className = 'img-btn';
+    imgBtn.className = 'img-btn feed-btn btn';
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -314,7 +322,9 @@ function renderEpisodes(list) {
       div.appendChild(img);
     }
     const title = document.createElement('div');
-    title.innerHTML = `<strong>${ep.title}</strong>`;
+    const strong = document.createElement('strong');
+    strong.textContent = ep.title;
+    title.appendChild(strong);
     div.appendChild(title);
     if (ep.transcript) {
       const t = document.createElement('div');
@@ -325,9 +335,11 @@ function renderEpisodes(list) {
     const btns = document.createElement('div');
     btns.className = 'article-buttons';
     const play = document.createElement('button');
+    play.className = 'article-btn btn';
     play.textContent = 'Play';
     play.onclick = (e) => { e.stopPropagation(); playEpisode(ep); };
     const dl = document.createElement('button');
+    dl.className = 'article-btn btn';
     dl.textContent = 'Download';
     dl.onclick = (e) => { e.stopPropagation(); downloadEpisode(ep); };
     btns.appendChild(play);
@@ -374,7 +386,9 @@ function renderArticles(articles) {
       div.appendChild(img);
     }
     const title = document.createElement('div');
-    title.innerHTML = `<strong>${a.title}</strong>`;
+    const strong = document.createElement('strong');
+    strong.textContent = a.title;
+    title.appendChild(strong);
     div.appendChild(title);
     if (a.feedTitle) {
       const source = document.createElement('div');
@@ -391,16 +405,19 @@ function renderArticles(articles) {
     const btns = document.createElement('div');
     btns.className = 'article-buttons';
     const starBtn = document.createElement('button');
-    starBtn.className = 'star-btn';
+    starBtn.className = 'star-btn article-btn';
     starBtn.textContent = isFavorite(a.link) ? '★' : '☆';
     starBtn.onclick = (e) => { e.stopPropagation(); toggleFavorite(a, starBtn); };
     const readBtn = document.createElement('button');
+    readBtn.className = 'article-btn btn';
     readBtn.textContent = 'Read';
     readBtn.onclick = (e) => { e.stopPropagation(); showArticle(a); };
     const downloadBtn = document.createElement('button');
+    downloadBtn.className = 'article-btn btn';
     downloadBtn.textContent = 'Download';
     downloadBtn.onclick = (e) => { e.stopPropagation(); downloadArticle(a); };
     const openBtn = document.createElement('button');
+    openBtn.className = 'article-btn btn';
     openBtn.textContent = 'Open';
     openBtn.onclick = (e) => { e.stopPropagation(); window.api.openLink(a.link); };
     btns.appendChild(starBtn);
@@ -418,11 +435,14 @@ function renderOffline(list) {
     const div = document.createElement('div');
     div.className = 'article';
     const title = document.createElement('div');
-    title.innerHTML = `<strong>${item.title}</strong>`;
+    const strong = document.createElement('strong');
+    strong.textContent = item.title;
+    title.appendChild(strong);
     div.appendChild(title);
     const btns = document.createElement('div');
     btns.className = 'article-buttons';
     const open = document.createElement('button');
+    open.className = 'article-btn btn';
     open.textContent = item.type === 'episode' ? 'Play' : 'Open';
     open.onclick = (e) => {
       e.stopPropagation();
@@ -462,7 +482,7 @@ async function showArticle(a) {
     ? `<img src="${a.image}" style="max-width:100%;margin-bottom:8px;"/>`
     : '';
   modalContent.innerHTML =
-    `<h2>${a.title}</h2>` +
+    `<h2>${sanitize(a.title)}</h2>` +
     imgPart +
     `<div class="reader" data-raw="" data-link="${a.link}"></div>` +
     `<div id="webContainer" style="display:none;width:100%;height:80vh;">
@@ -524,6 +544,15 @@ function colorFor(text) {
   return `hsl(${h},70%,60%)`;
 }
 
+function sanitize(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function showPrompt(label, placeholder = '') {
   return new Promise((res) => {
     dialogContent.innerHTML = `<div><div style="margin-bottom:8px;">${label}</div>` +
@@ -580,6 +609,7 @@ function showFeedSearch() {
           const title = document.createElement('span');
           title.textContent = item.title;
           const add = document.createElement('button');
+          add.className = 'btn';
           add.textContent = 'Add';
           add.onclick = async () => {
             const res = await window.api.fetchFeed(item.url);
@@ -728,10 +758,12 @@ function showAudioPlayer(ep) {
   const nav = document.createElement('div');
   nav.className = 'player-nav';
   const prev = document.createElement('button');
+  prev.className = 'btn';
   prev.textContent = '◀';
   prev.disabled = idx <= 0;
   prev.onclick = (e) => { e.stopPropagation(); if (idx > 0) playEpisode(currentEpisodes[idx - 1]); };
   const next = document.createElement('button');
+  next.className = 'btn';
   next.textContent = '▶';
   next.disabled = idx >= currentEpisodes.length - 1;
   next.onclick = (e) => { e.stopPropagation(); if (idx < currentEpisodes.length - 1) playEpisode(currentEpisodes[idx + 1]); };
