@@ -108,6 +108,7 @@ function normalizeFeeds(feeds) {
 
 function renderFeeds() {
   feedsDiv.innerHTML = '';
+  const frag = document.createDocumentFragment();
   const feeds = state.feeds
     .slice()
     .sort((a, b) => (state.feedWeights[b.url] || 0) - (state.feedWeights[a.url] || 0))
@@ -161,8 +162,9 @@ function renderFeeds() {
     row.appendChild(btn);
     row.appendChild(edit);
     row.appendChild(del);
-    feedsDiv.appendChild(row);
+    frag.appendChild(row);
   });
+  feedsDiv.appendChild(frag);
   if (feedDropdown) {
     feedDropdown.innerHTML = '';
     const allOpt = document.createElement('option');
@@ -377,6 +379,7 @@ function updateArticleDisplay() {
 
 function renderArticles(articles) {
   articlesDiv.innerHTML = '';
+  const frag = document.createDocumentFragment();
   articles.forEach(a => {
     const div = document.createElement('div');
     div.className = 'article';
@@ -425,12 +428,14 @@ function renderArticles(articles) {
     btns.appendChild(downloadBtn);
     btns.appendChild(openBtn);
     div.appendChild(btns);
-    articlesDiv.appendChild(div);
+    frag.appendChild(div);
   });
+  articlesDiv.appendChild(frag);
 }
 
 function renderOffline(list) {
   articlesDiv.innerHTML = '';
+  const frag = document.createDocumentFragment();
   list.forEach(item => {
     const div = document.createElement('div');
     div.className = 'article';
@@ -450,8 +455,9 @@ function renderOffline(list) {
     };
     btns.appendChild(open);
     div.appendChild(btns);
-    articlesDiv.appendChild(div);
+    frag.appendChild(div);
   });
+  articlesDiv.appendChild(frag);
 }
 
 async function showArticle(a) {
@@ -786,16 +792,21 @@ function showAudioPlayer(ep) {
   audioContent.onclick = (e) => e.stopPropagation();
   audioPlayer = audio;
 }
+const ogCache = {};
 
 async function fetchOgImage(url) {
-  try {
-    const res = await fetch(url);
-    const html = await res.text();
-    const m = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
-    return m ? m[1] : null;
-  } catch {
-    return null;
-  }
+  if (ogCache[url]) return ogCache[url];
+  ogCache[url] = (async () => {
+    try {
+      const res = await fetch(url);
+      const html = await res.text();
+      const m = html.match(/<meta[^>]+property=['"]og:image['"][^>]+content=['"]([^'"]+)['"]/i);
+      return m ? m[1] : null;
+    } catch {
+      return null;
+    }
+  })();
+  return ogCache[url];
 }
 
 function fetchAny(url) {
@@ -829,11 +840,9 @@ async function loadArticles(url) {
     }
     items = result.items;
     // Attempt to fetch open graph images for items missing a preview
-    for (const item of items.slice(0, 10)) {
-      if (!item.image) {
-        item.image = await fetchOgImage(item.link);
-      }
-    }
+    await Promise.all(items.slice(0, 10).map(async itm => {
+      if (!itm.image) itm.image = await fetchOgImage(itm.link);
+    }));
     state.articles[url] = items;
     const feed = state.feeds.find(f => (f.url || f) === url);
     if (feed) {
@@ -861,11 +870,9 @@ async function loadEpisodes(url) {
       return;
     }
     items = result.items;
-    for (const ep of items.slice(0, 5)) {
-      if (!ep.image) {
-        ep.image = await fetchOgImage(ep.link);
-      }
-    }
+    await Promise.all(items.slice(0, 5).map(async ep => {
+      if (!ep.image) ep.image = await fetchOgImage(ep.link);
+    }));
     const pod = state.podcasts.find(p => p.url === url);
     if (pod) {
       if (result.feedTitle) pod.title = result.feedTitle;
