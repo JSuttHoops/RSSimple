@@ -3,6 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const RSSParser = require('rss-parser');
 const parser = new RSSParser();
+const { JSDOM } = require('jsdom');
+const { Readability } = require('@mozilla/readability');
 
 const USER_DIR = app.getPath('userData');
 const DATA_FILE = path.join(USER_DIR, 'data.json');
@@ -67,7 +69,7 @@ function loadData() {
     }
     return data;
   } catch (e) {
-    const empty = { feeds: [], articles: [] };
+    const empty = { feeds: [], articles: {}, feedWeights: {}, prefs: {} };
     if (fs.existsSync(OPML_FILE)) {
       const parsed = parseOPML(OPML_FILE);
       const map = new Map(parsed.map(f => [f.url, f]));
@@ -121,7 +123,9 @@ ipcMain.handle('fetch-feed', async (_e, url) => {
            (i['media:thumbnail'] && i['media:thumbnail'].url) ||
            (i.content && (i.content.match(/<img[^>]+src=\"([^\"]+)\"/) || [])[1]),
     summary: i.contentSnippet || i.summary || '',
-    content: i['content:encoded'] || i.content || ''
+    content: i['content:encoded'] || i.content || '',
+    isoDate: i.isoDate,
+    pubDate: i.pubDate
   }));
   return { feedTitle: feed.title, items };
 });
@@ -144,4 +148,12 @@ ipcMain.handle('download-article', async (_e, { url, title }) => {
   const file = path.join(OFFLINE_DIR, sanitize(title) + '.html');
   fs.writeFileSync(file, html);
   return file;
+});
+
+ipcMain.handle('reader-parse', async (_e, url) => {
+  const res = await fetch(url);
+  const html = await res.text();
+  const dom = new JSDOM(html, { url });
+  const article = new Readability(dom.window.document).parse();
+  return article.content;
 });

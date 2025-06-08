@@ -6,4 +6,5 @@ contextBridge.exposeInMainWorld('api', {
   fetchFeed: (url) => ipcRenderer.invoke('fetch-feed', url),
   importOpml: (file) => ipcRenderer.invoke('import-opml', file),
   downloadArticle: (info) => ipcRenderer.invoke('download-article', info),
+  parseReader: (url) => ipcRenderer.invoke('reader-parse', url),
 });
