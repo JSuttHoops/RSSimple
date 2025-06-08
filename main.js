@@ -212,8 +212,19 @@ ipcMain.handle('download-article', async (_e, { url, title }) => {
   ensureOfflineDir();
   const res = await fetch(url);
   const html = await res.text();
+  let content = html;
+  try {
+    const dom = new JSDOM(html, { url });
+    const parsed = new Readability(dom.window.document).parse();
+    if (parsed && parsed.content) content = parsed.content;
+  } catch {}
+  const style =
+    '<style>body{font-family:sans-serif;margin:16px;}img{max-width:100%;}</style>';
   const file = path.join(OFFLINE_DIR, sanitize(title) + '.html');
-  fs.writeFileSync(file, html);
+  fs.writeFileSync(
+    file,
+    `<!DOCTYPE html><meta charset="utf-8">${style}${content}`
+  );
   return file;
 });
 

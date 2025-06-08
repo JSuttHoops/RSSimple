@@ -208,6 +208,28 @@ function renderPodcasts() {
       };
       reader.readAsDataURL(file);
     };
+    const artBtn = document.createElement('button');
+    artBtn.textContent = 'Add';
+    artBtn.className = 'img-btn';
+    const artInput = document.createElement('input');
+    artInput.type = 'file';
+    artInput.accept = '.png,.jpg,.jpeg';
+    artInput.style.display = 'none';
+    artBtn.onclick = (e) => { e.stopPropagation(); artInput.click(); };
+    artInput.onchange = () => {
+      const file = artInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result;
+        if (state.episodes[p.url]) {
+          state.episodes[p.url].forEach(ep => { ep.image = dataUrl; });
+        }
+        window.api.saveData(state);
+        if (currentPodcast === p.url) renderEpisodes(filterArticles(state.episodes[p.url] || []));
+      };
+      reader.readAsDataURL(file);
+    };
     const del = document.createElement('button');
     del.textContent = '✖';
     del.className = 'del-feed';
@@ -223,6 +245,8 @@ function renderPodcasts() {
     row.appendChild(btn);
     row.appendChild(imgBtn);
     row.appendChild(input);
+    row.appendChild(artBtn);
+    row.appendChild(artInput);
     row.appendChild(del);
     podcastFeedsDiv.appendChild(row);
   });
@@ -951,6 +975,7 @@ opmlInput.onchange = async () => {
   state.prefs = data.prefs || {};
   state.podcasts = data.podcasts || [];
   state.episodes = data.episodes || {};
+  state.offline = data.offline || [];
   applyTheme();
   applyLayout();
   showPodcastMode(false);
