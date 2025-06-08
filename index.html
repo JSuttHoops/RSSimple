@@ -4,6 +4,14 @@
   <meta charset="UTF-8" />
   <title>RSSimple</title>
   <style>
+    ::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
+
+    * {
+      scrollbar-width: none;
+    }
     body {
       margin: 0;
       font-family: "Segoe UI", Tahoma, sans-serif;
@@ -29,6 +37,7 @@
     #sidebar {
       width: 200px;
       margin-right: 20px;
+      overflow-x: hidden;
     }
 
     #main {
@@ -77,6 +86,14 @@
       border: 1px solid rgba(0, 0, 0, 0.1);
     }
 
+    #feedDropdown {
+      width: 100%;
+      padding: 6px 8px;
+      margin: 0 0 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
     #feeds {
       margin-bottom: 10px;
       max-height: 60vh;
@@ -84,7 +101,6 @@
     }
 
     #feeds button {
-      width: 100%;
       margin: 4px 0;
     }
 
@@ -92,9 +108,18 @@
       display: flex;
       align-items: center;
       gap: 6px;
+      width: 100%;
     }
 
-    .edit-feed {
+    .feed-row button:not(.edit-feed):not(.del-feed) {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .edit-feed,
+    .del-feed {
       width: 32px;
       padding: 4px;
     }
@@ -120,11 +145,53 @@
       gap: 8px;
     }
 
+    .star-btn {
+      background: none;
+      font-size: 20px;
+      padding: 0 4px;
+    }
+
     .summary {
       overflow: hidden;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
+    }
+
+    #newsLibrary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .feed-tile {
+      width: 100px;
+      text-align: center;
+      position: relative;
+    }
+
+    .feed-tile img, .feed-tile .feed-default {
+      width: 100px;
+      height: 100px;
+      object-fit: cover;
+      border-radius: 8px;
+      display: block;
+    }
+
+    .feed-default {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      color: #fff;
+    }
+
+    .img-btn {
+      position: absolute;
+      right: 4px;
+      bottom: 4px;
+      padding: 2px 4px;
+      font-size: 12px;
     }
 
     #readerBar {
@@ -167,7 +234,11 @@
 
     .reader {
       max-height: 70vh;
+      max-width: 700px;
+      margin: 0 auto;
       overflow: auto;
+      line-height: 1.6;
+      font-size: 18px;
       color: inherit;
     }
 
@@ -296,24 +367,104 @@
     body[data-theme='dark'] #readerBar {
       background: rgba(0, 0, 0, 0.4);
     }
+
+    body[data-layout='bottom'] #app {
+      flex-direction: column;
+    }
+    body[data-layout='bottom'] #sidebar {
+      width: 100%;
+      order: 2;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    body[data-layout='bottom'] #feeds {
+      flex: 1 1 auto;
+      display: flex;
+      flex-wrap: wrap;
+    }
+    body[data-layout='gallery'] #articles {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    body[data-layout='gallery'] .article {
+      width: calc(33% - 12px);
+    }
+
+    @media (max-width: 900px) {
+      #app {
+        flex-direction: column;
+        width: 95%;
+      }
+
+      #sidebar {
+        width: 100%;
+        margin-right: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      #feeds {
+        max-height: none;
+        order: 1;
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+      }
+
+      #feeds button {
+        flex: 1 1 auto;
+      }
+
+      #main {
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
   <div id="app">
     <div id="sidebar">
-      <input type="file" id="opml" accept=".opml" />
-      <button id="addFeeds">Upload OPML</button>
-      <input type="text" id="feedFilter" placeholder="Filter feeds" />
-      <div id="feeds"></div>
-      <div style="display:flex;gap:6px;margin-top:4px;">
-        <button id="allFeeds">All Recent</button>
-        <button id="refreshAll" title="Refresh">⟳</button>
+      <div id="rssControls">
+        <input type="file" id="opml" accept=".opml" />
+        <button id="addFeeds">Upload OPML</button>
+        <button id="addFeed">Add Feed</button>
+        <input type="text" id="feedFilter" placeholder="Filter feeds" />
+        <select id="feedDropdown"></select>
+        <div id="feeds"></div>
+        <div style="display:flex;gap:6px;margin-top:4px;">
+          <button id="allFeeds">All Recent</button>
+          <button id="favoritesBtn">Favorites</button>
+          <button id="refreshAll" title="Refresh">⟳</button>
+        </div>
       </div>
+      <div id="podcastControls" style="display:none">
+        <button id="addPodcast">Add Podcast</button>
+        <div id="podcastFeeds"></div>
+      </div>
+      <button id="podcastLib">Podcasts</button>
+      <button id="newsLib">News Library</button>
       <button id="settingsBtn">Settings</button>
     </div>
     <div id="main">
       <h1>RSSimple</h1>
+      <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center;">
+        <input type="text" id="searchInput" placeholder="Search" style="flex:1" />
+        <select id="rangeSelect">
+          <option value="1">Past day</option>
+          <option value="3">Past 3 days</option>
+          <option value="7">Past week</option>
+          <option value="since">Since...</option>
+        </select>
+        <input type="date" id="sinceDate" style="display:none" />
+      </div>
+      <input type="text" id="newsSearch" placeholder="Search outlets" style="display:none;width:100%;margin-bottom:8px;" />
+      <div id="newsLibrary" style="display:none"></div>
       <div id="articles"></div>
+      <div id="episodes" style="display:none"></div>
     </div>
   </div>
   <div class="modal" id="modal">

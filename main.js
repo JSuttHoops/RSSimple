@@ -2,7 +2,15 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const RSSParser = require('rss-parser');
-const parser = new RSSParser();
+const parser = new RSSParser({
+  customFields: {
+    feed: [['itunes:image', 'itunesImage']],
+    item: [
+      ['itunes:image', 'itunesImage'],
+      ['podcast:transcript', 'transcript']
+    ]
+  }
+});
 const { JSDOM } = require('jsdom');
 const { Readability } = require('@mozilla/readability');
 
@@ -61,6 +69,9 @@ function parseOPML(filePath) {
 function loadData() {
   try {
     const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    if (!data.favorites) data.favorites = [];
+    if (!data.podcasts) data.podcasts = [];
+    if (!data.episodes) data.episodes = {};
     if (data.feeds.length === 0 && fs.existsSync(OPML_FILE)) {
       const parsed = parseOPML(OPML_FILE);
       const map = new Map(parsed.map(f => [f.url, f]));
@@ -69,7 +80,7 @@ function loadData() {
     }
     return data;
   } catch (e) {
-    const empty = { feeds: [], articles: {}, feedWeights: {}, prefs: {} };
+    const empty = { feeds: [], articles: {}, feedWeights: {}, favorites: [], prefs: {}, podcasts: [], episodes: {} };
     if (fs.existsSync(OPML_FILE)) {
       const parsed = parseOPML(OPML_FILE);
       const map = new Map(parsed.map(f => [f.url, f]));
@@ -114,20 +125,46 @@ ipcMain.handle('load-data', () => loadData());
 ipcMain.handle('save-data', (_e, data) => saveData(data));
 
 ipcMain.handle('fetch-feed', async (_e, url) => {
-  const feed = await parser.parseURL(url);
-  const items = feed.items.map(i => ({
-    title: i.title,
-    link: i.link,
-    image: i.enclosure?.url ||
-           (i['media:content'] && i['media:content'].url) ||
-           (i['media:thumbnail'] && i['media:thumbnail'].url) ||
-           (i.content && (i.content.match(/<img[^>]+src=\"([^\"]+)\"/) || [])[1]),
-    summary: i.contentSnippet || i.summary || '',
-    content: i['content:encoded'] || i.content || '',
-    isoDate: i.isoDate,
-    pubDate: i.pubDate
-  }));
-  return { feedTitle: feed.title, items };
+  try {
+    const feed = await parser.parseURL(url);
+    const items = feed.items.map(i => ({
+      title: i.title,
+      link: i.link,
+      image: i.enclosure?.url ||
+             (i['media:content'] && i['media:content'].url) ||
+             (i['media:thumbnail'] && i['media:thumbnail'].url) ||
+             (i.content && (i.content.match(/<img[^>]+src=\"([^\"]+)\"/) || [])[1]),
+      summary: i.contentSnippet || i.summary || '',
+      content: i['content:encoded'] || i.content || '',
+      isoDate: i.isoDate,
+      pubDate: i.pubDate
+    }));
+    const image = feed.image?.url || '';
+    return { feedTitle: feed.title, items, image };
+  } catch (e) {
+    return { error: e.message, items: [] };
+  }
+});
+
+ipcMain.handle('fetch-podcast', async (_e, url) => {
+  try {
+    const feed = await parser.parseURL(url);
+    const feedImage = feed.itunesImage || feed.image?.url || '';
+    const items = feed.items
+      .map(i => ({
+        title: i.title,
+        link: i.link,
+        audio: i.enclosure?.url,
+        image: i.itunesImage || i.image || feedImage,
+        transcript: i.transcript || '',
+        isoDate: i.isoDate,
+        pubDate: i.pubDate
+      }))
+      .filter(i => i.audio);
+    return { feedTitle: feed.title, items, image: feedImage };
+  } catch (e) {
+    return { error: e.message, items: [] };
+  }
 });
 
 ipcMain.handle('import-opml', async (_e, filePath) => {
@@ -147,6 +184,16 @@ ipcMain.handle('download-article', async (_e, { url, title }) => {
   const html = await res.text();
   const file = path.join(OFFLINE_DIR, sanitize(title) + '.html');
   fs.writeFileSync(file, html);
+  return file;
+});
+
+ipcMain.handle('download-episode', async (_e, { url, title }) => {
+  ensureOfflineDir();
+  const res = await fetch(url);
+  const buffer = await res.arrayBuffer();
+  const ext = path.extname(url).split('?')[0] || '.mp3';
+  const file = path.join(OFFLINE_DIR, sanitize(title) + ext);
+  fs.writeFileSync(file, Buffer.from(buffer));
   return file;
 });
 

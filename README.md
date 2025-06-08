@@ -23,9 +23,22 @@ Now includes a sidebar feed list with filtering and editable feed names.
 - Local JSON storage of feeds and articles so your subscriptions persist between runs.
 - Sidebar with feed filtering.
 - Edit feed titles inline.
+- Delete feeds with the ✖ button.
+- Add new feeds manually.
+- Dropdown to quickly switch between feeds.
 - Dark mode that follows system preference.
 - Weighted feed sorting based on how often you open a feed.
 - "All Recent" tab aggregates articles from the past week.
 - On startup, feeds are prefetched concurrently and "All Recent" loads by default.
 - Reader mode with adjustable font and background color.
+- Improved reader formatting and responsive layout.
+- Hidden scrollbars for a cleaner look.
 - Settings modal for customisation.
+- Graceful error handling when feeds fail to load.
+- Mark articles as favorites with the ★ button and view them in a Favorites tab.
+- Quick search box with date filtering for recent articles.
+- Choose between sidebar, bottom bar or gallery layouts in settings.
+- Subscribe to podcasts and browse them in the Podcast Library.
+- Episode lists show cover art with Play and Download options.
+- Transcripts are stored when available so episodes appear in search results.
+- Organise feeds visually in the News Library with custom logos.

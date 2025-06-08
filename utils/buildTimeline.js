@@ -6,7 +6,7 @@ function buildTimeline(feeds, fetchFn, opts = {}) {
       const feed = feeds[i];
       const url = feed.url || feed;
       const res = results[i];
-      if (res.status === 'fulfilled') {
+      if (res.status === 'fulfilled' && !res.value.error) {
         const { feedTitle, items } = res.value;
         if (feedTitle && !feed.title) feed.title = feedTitle;
         perFeed[url] = items;
