@@ -160,9 +160,9 @@ function renderFeeds() {
     const edit = document.createElement('button');
     edit.textContent = '✎';
     edit.className = 'edit-feed feed-btn btn';
-    edit.onclick = (e) => {
+    edit.onclick = async (e) => {
       e.stopPropagation();
-      const val = prompt('Feed Name', title);
+      const val = await showPrompt('Feed Name', '', title);
       if (val) {
         feed.title = val;
         scheduleSave();
@@ -593,7 +593,7 @@ function sanitize(text) {
     .replace(/'/g, '&#39;');
 }
 
-function showPrompt(label, placeholder = '') {
+function showPrompt(label, placeholder = '', value = '') {
   return new Promise((res) => {
     dialogContent.innerHTML = `<div><div style="margin-bottom:8px;">${label}</div>` +
       `<input id="promptInput" style="width:100%;margin-bottom:8px;" placeholder="${placeholder}"/>` +
@@ -603,6 +603,7 @@ function showPrompt(label, placeholder = '') {
     dialogModal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
     const input = document.getElementById('promptInput');
+    input.value = value;
     const close = (val) => {
       dialogModal.style.display = 'none';
       document.body.style.overflow = '';
