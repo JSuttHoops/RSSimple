@@ -1,0 +1,19 @@
+{
+  "name": "rssimple",
+  "version": "1.0.0",
+  "description": "\"# RSSimple\"",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"No tests specified\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "electron": "^29.4.6",
+    "fast-xml-parser": "^5.2.5",
+    "rss-parser": "^3.13.0"
+  }
+}
