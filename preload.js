@@ -10,4 +10,6 @@ contextBridge.exposeInMainWorld('api', {
   downloadArticle: (info) => ipcRenderer.invoke('download-article', info),
   downloadEpisode: (info) => ipcRenderer.invoke('download-episode', info),
   parseReader: (url) => ipcRenderer.invoke('reader-parse', url),
+  openLink: (url) => ipcRenderer.invoke('open-link', url),
+  fetchBluesky: (handle) => ipcRenderer.invoke('fetch-bluesky', handle),
 });

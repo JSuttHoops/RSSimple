@@ -20,6 +20,8 @@ const refreshAllBtn = document.getElementById('refreshAll');
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsModal = document.getElementById('settingsModal');
 const settingsContent = document.getElementById('settingsContent');
+const dialogModal = document.getElementById('dialogModal');
+const dialogContent = document.getElementById('dialogContent');
 const podcastLibBtn = document.getElementById('podcastLib');
 const newsLibBtn = document.getElementById('newsLib');
 const addPodcastBtn = document.getElementById('addPodcast');
@@ -31,6 +33,7 @@ const rssControls = document.getElementById('rssControls');
 const podcastControls = document.getElementById('podcastControls');
 allFeedsBtn.dataset.feed = '*';
 favoritesBtn.dataset.feed = 'favorites';
+readerBar.onclick = (e) => e.stopPropagation();
 
 let state = {
   feeds: [],
@@ -316,9 +319,13 @@ function renderArticles(articles) {
     const downloadBtn = document.createElement('button');
     downloadBtn.textContent = 'Download';
     downloadBtn.onclick = (e) => { e.stopPropagation(); downloadArticle(a); };
+    const openBtn = document.createElement('button');
+    openBtn.textContent = 'Open';
+    openBtn.onclick = (e) => { e.stopPropagation(); window.api.openLink(a.link); };
     btns.appendChild(starBtn);
     btns.appendChild(readBtn);
     btns.appendChild(downloadBtn);
+    btns.appendChild(openBtn);
     div.appendChild(btns);
     articlesDiv.appendChild(div);
   });
@@ -387,8 +394,43 @@ function colorFor(text) {
   return `hsl(${h},70%,60%)`;
 }
 
+function showPrompt(label, placeholder = '') {
+  return new Promise((res) => {
+    dialogContent.innerHTML = `<div><div style="margin-bottom:8px;">${label}</div>` +
+      `<input id="promptInput" style="width:100%;margin-bottom:8px;" placeholder="${placeholder}"/>` +
+      `<div style="display:flex;gap:6px;">` +
+      `<button id="promptOk">OK</button><button id="promptCancel">Cancel</button>` +
+      `</div></div>`;
+    dialogModal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    const input = document.getElementById('promptInput');
+    const close = (val) => {
+      dialogModal.style.display = 'none';
+      document.body.style.overflow = '';
+      res(val);
+    };
+    dialogModal.onclick = () => close(null);
+    dialogContent.onclick = (e) => e.stopPropagation();
+    document.getElementById('promptOk').onclick = () => close(input.value.trim());
+    document.getElementById('promptCancel').onclick = () => close(null);
+    input.focus();
+  });
+}
+
+function isBluesky(url) {
+  return /^@/.test(url) || /bsky\.(app|social)/i.test(url);
+}
+
+function bskyHandle(input) {
+  let h = input.replace(/^bsky:\/\//i, '');
+  h = h.replace(/^https?:\/\/(www\.)?bsky\.app\/profile\//i, '').replace(/\/.*$/, '');
+  if (h.startsWith('@')) h = h.slice(1);
+  return h;
+}
+
 function applyReaderPrefs() {
   modalContent.style.fontFamily = state.prefs.font || 'sans-serif';
+  modalContent.style.fontSize = (state.prefs.textSize || 18) + 'px';
   const bg = state.prefs.bg || '#fff';
   modalContent.style.background = bg;
   modalContent.style.color = textColorFor(bg);
@@ -451,9 +493,16 @@ async function fetchOgImage(url) {
   }
 }
 
+function fetchAny(url) {
+  if (url.startsWith('bsky:')) {
+    return window.api.fetchBluesky(url.slice(5));
+  }
+  return window.api.fetchFeed(url);
+}
+
 async function prefetchAll() {
   articlesDiv.innerHTML = '<div class="spinner"></div>';
-  const { timeline, perFeed } = await window.buildTimeline(state.feeds, window.api.fetchFeed);
+  const { timeline, perFeed } = await window.buildTimeline(state.feeds, fetchAny);
   Object.assign(state.articles, perFeed, { '*': timeline });
   await window.api.saveData(state);
   currentFeed = '*';
@@ -467,7 +516,7 @@ async function loadArticles(url) {
   state.feedWeights[url] = (state.feedWeights[url] || 0) + 1;
   let items = state.articles[url];
   if (!items) {
-    const result = await window.api.fetchFeed(url);
+    const result = await fetchAny(url);
     if (result.error) {
       alert('Failed to fetch feed: ' + result.error);
       articlesDiv.innerHTML = '';
@@ -526,13 +575,25 @@ addFeedsBtn.onclick = () => {
 };
 
 addFeedBtn.onclick = async () => {
-  const url = prompt('Feed URL');
-  if (!url) return;
-  if (state.feeds.some(f => (f.url || f) === url)) {
-    alert('Feed already exists');
-    return;
+  const input = await showPrompt('Feed URL', 'https:// or @user');
+  if (!input) return;
+  let url = input;
+  let res;
+  if (isBluesky(url)) {
+    const handle = bskyHandle(url);
+    if (state.feeds.some(f => (f.url || f) === `bsky:${handle}`)) {
+      alert('Feed already exists');
+      return;
+    }
+    res = await window.api.fetchBluesky(handle);
+    url = `bsky:${handle}`;
+  } else {
+    if (state.feeds.some(f => (f.url || f) === url)) {
+      alert('Feed already exists');
+      return;
+    }
+    res = await window.api.fetchFeed(url);
   }
-  const res = await window.api.fetchFeed(url);
   if (res.error) {
     alert('Failed to add feed: ' + res.error);
     return;
@@ -544,7 +605,7 @@ addFeedBtn.onclick = async () => {
 };
 
 addPodcastBtn.onclick = async () => {
-  const input = prompt('Podcast RSS URL or search term');
+  const input = await showPrompt('Podcast RSS URL or search term');
   if (!input) return;
   let url = input;
   if (!/^https?:/i.test(input)) {
@@ -553,7 +614,8 @@ addPodcastBtn.onclick = async () => {
       alert('No results');
       return;
     }
-    const choice = prompt(
+    const choice = await showPrompt(
+      'Choose 1-' + results.length + '\n' +
       results.map((r, i) => `${i + 1}: ${r.title}`).join('\n')
     );
     const idx = parseInt(choice, 10) - 1;
@@ -699,18 +761,21 @@ settingsBtn.onclick = () => {
     <div>Theme: <select id="themeSel"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></div>
     <div>Default Feed: <select id="defaultFeed"><option value="*">All Recent</option>${state.feeds.map(f => `<option value="${f.url}">${f.title || f.url}</option>`).join('')}</select></div>
     <div>Layout: <select id="layoutSel"><option value="sidebar">Sidebar</option><option value="bottom">Bottom Bar</option><option value="gallery">Gallery</option></select></div>
+    <div>Text Size: <input type="number" id="textSize" min="12" max="30" value="${state.prefs.textSize || 18}"/></div>
     <button id="closeSettings">Close</button>`;
   settingsModal.style.display = 'flex';
   document.getElementById('setFont').value = state.prefs.font || 'sans-serif';
   document.getElementById('themeSel').value = state.prefs.theme || 'system';
   document.getElementById('defaultFeed').value = state.prefs.defaultFeed || '*';
   document.getElementById('layoutSel').value = state.prefs.layout || 'sidebar';
+  document.getElementById('textSize').value = state.prefs.textSize || 18;
   document.getElementById('closeSettings').onclick = () => {
     state.prefs.font = document.getElementById('setFont').value;
     state.prefs.bg = document.getElementById('setBg').value;
     state.prefs.theme = document.getElementById('themeSel').value;
     state.prefs.defaultFeed = document.getElementById('defaultFeed').value;
     state.prefs.layout = document.getElementById('layoutSel').value;
+    state.prefs.textSize = parseInt(document.getElementById('textSize').value, 10) || 18;
     settingsModal.style.display = 'none';
     applyTheme();
     applyLayout();
