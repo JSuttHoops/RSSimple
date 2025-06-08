@@ -4,7 +4,9 @@ contextBridge.exposeInMainWorld('api', {
   loadData: () => ipcRenderer.invoke('load-data'),
   saveData: (data) => ipcRenderer.invoke('save-data', data),
   fetchFeed: (url) => ipcRenderer.invoke('fetch-feed', url),
+  fetchPodcast: (url) => ipcRenderer.invoke('fetch-podcast', url),
   importOpml: (file) => ipcRenderer.invoke('import-opml', file),
   downloadArticle: (info) => ipcRenderer.invoke('download-article', info),
+  downloadEpisode: (info) => ipcRenderer.invoke('download-episode', info),
   parseReader: (url) => ipcRenderer.invoke('reader-parse', url),
 });
