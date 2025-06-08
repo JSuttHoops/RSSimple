@@ -53,19 +53,33 @@
       border-radius: 8px;
       padding: 8px 12px;
       color: inherit;
-      background: rgba(255, 255, 255, 0.6);
-      backdrop-filter: blur(8px);
       cursor: pointer;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
       transition: background 0.2s, transform 0.2s;
     }
 
-    button:hover {
+    .btn {
+      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn:hover {
       background: rgba(255, 255, 255, 0.8);
     }
 
-    button:active {
+    .btn:active {
       transform: scale(0.96);
+    }
+
+    .ghost {
+      background: transparent;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .ghost {
+        border-color: rgba(255, 255, 255, 0.25);
+      }
     }
 
     .active {
@@ -151,6 +165,8 @@
       border-radius: 8px;
       padding: 10px;
       margin-bottom: 12px;
+      max-width: 650px;
+      width: 100%;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
 
@@ -159,6 +175,14 @@
       margin-bottom: 6px;
       max-width: 100%;
       display: block;
+    }
+
+    #articles img,
+    #episodes img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      object-fit: cover;
     }
 
     .article-buttons {
@@ -171,6 +195,11 @@
       background: none;
       font-size: 20px;
       padding: 0 4px;
+    }
+
+    .feed-btn,
+    .article-btn {
+      padding: 4px 8px;
     }
 
     .summary {
@@ -377,11 +406,11 @@
       border: 1px solid rgba(255, 255, 255, 0.45);
     }
 
-    body[data-theme='light'] button {
+    body[data-theme='light'] .btn {
       background: rgba(255, 255, 255, 0.4);
     }
 
-    body[data-theme='light'] button:hover {
+    body[data-theme='light'] .btn:hover {
       background: rgba(255, 255, 255, 0.6);
     }
 
@@ -407,11 +436,11 @@
       border: 1px solid rgba(255, 255, 255, 0.2);
     }
 
-    body[data-theme='dark'] button {
+    body[data-theme='dark'] .btn {
       background: rgba(255, 255, 255, 0.25);
     }
 
-    body[data-theme='dark'] button:hover {
+    body[data-theme='dark'] .btn:hover {
       background: rgba(255, 255, 255, 0.35);
     }
 
@@ -497,31 +526,31 @@
     <div id="sidebar">
       <div id="rssControls">
         <input type="file" id="opml" accept=".opml" />
-        <button id="addFeeds">Upload OPML</button>
-        <button id="addFeed">Add Feed</button>
+        <button id="addFeeds" class="btn">Upload OPML</button>
+        <button id="addFeed" class="btn">Add Feed</button>
         <input type="text" id="feedFilter" placeholder="Filter feeds" />
         <select id="feedDropdown"></select>
         <div id="feeds"></div>
         <div style="display:flex;gap:6px;margin-top:4px;">
-          <button id="allFeeds">All Recent</button>
-          <button id="favoritesBtn">Favorites</button>
-          <button id="offlineBtn">Offline</button>
-          <button id="favFeedsBtn">Favorite Feeds</button>
-          <button id="refreshAll" title="Refresh">⟳</button>
+          <button id="allFeeds" class="btn">All Recent</button>
+          <button id="favoritesBtn" class="btn">Favorites</button>
+          <button id="offlineBtn" class="btn">Offline</button>
+          <button id="favFeedsBtn" class="btn">Favorite Feeds</button>
+          <button id="refreshAll" class="btn" title="Refresh">⟳</button>
         </div>
       </div>
       <div id="podcastControls" style="display:none">
-        <button id="addPodcast">Add Podcast</button>
+        <button id="addPodcast" class="btn">Add Podcast</button>
         <div id="podcastFeeds"></div>
       </div>
     </div>
     <div id="main">
       <h1>RSSimple</h1>
       <div id="tabs">
-        <button id="podcastLib">Podcasts</button>
-        <button id="newsLib">News Library</button>
-        <button id="exploreBtn">Explore</button>
-        <button id="settingsBtn">Settings</button>
+        <button id="podcastLib" class="btn">Podcasts</button>
+        <button id="newsLib" class="btn">News Library</button>
+        <button id="exploreBtn" class="btn">Explore</button>
+        <button id="settingsBtn" class="btn">Settings</button>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center;">
         <input type="text" id="searchInput" placeholder="Search" style="flex:1" />
@@ -542,8 +571,8 @@
   <div class="modal" id="modal">
     <div class="modal-content" id="modalContent"></div>
     <div id="readerBar">
-      <button id="toggleReader">Reader Mode</button>
-      <button id="webMode">Web Mode</button>
+      <button id="toggleReader" class="btn">Reader Mode</button>
+      <button id="webMode" class="btn">Web Mode</button>
       <select id="fontSelect">
         <option value="sans-serif">Sans</option>
         <option value="serif">Serif</option>
