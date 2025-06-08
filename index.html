@@ -24,18 +24,19 @@
     }
 
     #app {
-      background: rgba(255, 255, 255, 0.3);
-      backdrop-filter: blur(14px);
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.45);
-      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-      padding: 20px 30px;
-      width: 100%;
-      min-width: 800px;
-      transition: width 0.2s ease;
-      display: flex;
-      overflow: auto;
-    }
+        background: rgba(255, 255, 255, 0.3);
+        backdrop-filter: blur(14px);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.45);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        padding: 20px 30px;
+        width: 95vw;
+        max-width: 1600px;
+        margin: 0 auto;
+        transition: width 0.2s ease;
+        display: flex;
+        overflow: auto;
+      }
 
     #sidebar {
       width: 200px;
@@ -51,6 +52,7 @@
       border: none;
       border-radius: 8px;
       padding: 8px 12px;
+      color: inherit;
       background: rgba(255, 255, 255, 0.6);
       backdrop-filter: blur(8px);
       cursor: pointer;
@@ -457,11 +459,11 @@
       width: calc(33% - 12px);
     }
 
-    @media (max-width: 900px) {
-      #app {
-        flex-direction: column;
-        width: 100%;
-      }
+      @media (max-width: 900px) {
+        #app {
+          flex-direction: column;
+          width: 95%;
+        }
 
       #sidebar {
         width: 100%;
