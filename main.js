@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const RSSParser = require('rss-parser');
@@ -215,4 +215,36 @@ ipcMain.handle('reader-parse', async (_e, url) => {
   const dom = new JSDOM(html, { url });
   const article = new Readability(dom.window.document).parse();
   return article.content;
+});
+
+ipcMain.handle('open-link', (_e, url) => {
+  shell.openExternal(url);
+});
+
+ipcMain.handle('fetch-bluesky', async (_e, handle) => {
+  try {
+    const res = await fetch(`https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed?actor=${encodeURIComponent(handle)}&limit=20`);
+    const json = await res.json();
+    const items = (json.feed || []).map(it => {
+      const post = it.post;
+      const record = post.record || {};
+      const author = post.author?.handle || handle;
+      const id = post.uri.split('/').pop();
+      const link = `https://bsky.app/profile/${author}/post/${id}`;
+      const text = record.text || '';
+      const img = post.embed?.images?.[0]?.thumb || '';
+      return {
+        title: text.slice(0, 50),
+        link,
+        image: img,
+        summary: text,
+        content: text,
+        isoDate: post.indexedAt,
+        pubDate: record.createdAt
+      };
+    });
+    return { feedTitle: handle, items };
+  } catch (e) {
+    return { error: e.message, items: [] };
+  }
 });
