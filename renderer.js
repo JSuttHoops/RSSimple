@@ -6,6 +6,7 @@ const filterInput = document.getElementById('feedFilter');
 const feedDropdown = document.getElementById('feedDropdown');
 const articlesDiv = document.getElementById('articles');
 const favoritesBtn = document.getElementById('favoritesBtn');
+const offlineBtn = document.getElementById("offlineBtn");
 const favFeedsBtn = document.getElementById('favFeedsBtn');
 const searchInput = document.getElementById('searchInput');
 const rangeSelect = document.getElementById('rangeSelect');
@@ -39,6 +40,7 @@ const podcastControls = document.getElementById('podcastControls');
 allFeedsBtn.dataset.feed = '*';
 favoritesBtn.dataset.feed = 'favorites';
 favFeedsBtn.dataset.feed = 'favfeeds';
+offlineBtn.dataset.feed = "offline";
 readerBar.onclick = (e) => e.stopPropagation();
 
 let state = {
@@ -49,7 +51,8 @@ let state = {
   favoriteFeeds: [],
   prefs: {},
   podcasts: [],
-  episodes: {}
+  episodes: {},
+  offline: []
 };
 let filterText = '';
 let readerMode = false;
@@ -299,6 +302,8 @@ function filterArticles(list) {
 function updateArticleDisplay() {
   if (podcastMode) {
     renderEpisodes(filterArticles(currentEpisodes));
+  } else if (currentFeed === 'offline') {
+    renderOffline(currentArticles);
   } else {
     renderArticles(filterArticles(currentArticles));
   }
@@ -348,6 +353,28 @@ function renderArticles(articles) {
     btns.appendChild(readBtn);
     btns.appendChild(downloadBtn);
     btns.appendChild(openBtn);
+    div.appendChild(btns);
+    articlesDiv.appendChild(div);
+  });
+}
+
+function renderOffline(list) {
+  articlesDiv.innerHTML = '';
+  list.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'article';
+    const title = document.createElement('div');
+    title.innerHTML = `<strong>${item.title}</strong>`;
+    div.appendChild(title);
+    const btns = document.createElement('div');
+    btns.className = 'article-buttons';
+    const open = document.createElement('button');
+    open.textContent = item.type === 'episode' ? 'Play' : 'Open';
+    open.onclick = (e) => {
+      e.stopPropagation();
+      window.api.openLink('file://' + item.file);
+    };
+    btns.appendChild(open);
     div.appendChild(btns);
     articlesDiv.appendChild(div);
   });
@@ -549,11 +576,25 @@ webModeBtn.onclick = () => {
 
 async function downloadArticle(a) {
   const file = await window.api.downloadArticle({ url: a.link, title: a.title });
+  state.offline.push({
+    title: a.title,
+    link: a.link,
+    file,
+    type: 'article'
+  });
+  window.api.saveData(state);
   alert(`Saved to ${file}`);
 }
 
 async function downloadEpisode(ep) {
   const file = await window.api.downloadEpisode({ url: ep.audio, title: ep.title });
+  state.offline.push({
+    title: ep.title,
+    audio: ep.audio,
+    file,
+    type: 'episode'
+  });
+  window.api.saveData(state);
   alert(`Saved to ${file}`);
 }
 
@@ -920,6 +961,12 @@ favoritesBtn.onclick = () => {
   currentArticles = state.favorites;
   updateArticleDisplay();
   setActiveFeedButton('favorites');
+};
+offlineBtn.onclick = () => {
+  currentFeed = "offline";
+  currentArticles = state.offline;
+  updateArticleDisplay();
+  setActiveFeedButton("offline");
 };
 
 favFeedsBtn.onclick = async () => {
