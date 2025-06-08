@@ -73,6 +73,7 @@ function loadData() {
     if (!data.favoriteFeeds) data.favoriteFeeds = [];
     if (!data.podcasts) data.podcasts = [];
     if (!data.episodes) data.episodes = {};
+    if (!data.offline) data.offline = [];
     if (data.feeds.length === 0 && fs.existsSync(OPML_FILE)) {
       const parsed = parseOPML(OPML_FILE);
       const map = new Map(parsed.map(f => [f.url, f]));
@@ -81,7 +82,7 @@ function loadData() {
     }
     return data;
   } catch (e) {
-    const empty = { feeds: [], articles: {}, feedWeights: {}, favorites: [], favoriteFeeds: [], prefs: {}, podcasts: [], episodes: {} };
+    const empty = { feeds: [], articles: {}, feedWeights: {}, favorites: [], favoriteFeeds: [], prefs: {}, podcasts: [], episodes: {}, offline: [] };
     if (fs.existsSync(OPML_FILE)) {
       const parsed = parseOPML(OPML_FILE);
       const map = new Map(parsed.map(f => [f.url, f]));
