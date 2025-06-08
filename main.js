@@ -70,6 +70,7 @@ function loadData() {
   try {
     const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     if (!data.favorites) data.favorites = [];
+    if (!data.favoriteFeeds) data.favoriteFeeds = [];
     if (!data.podcasts) data.podcasts = [];
     if (!data.episodes) data.episodes = {};
     if (data.feeds.length === 0 && fs.existsSync(OPML_FILE)) {
@@ -80,7 +81,7 @@ function loadData() {
     }
     return data;
   } catch (e) {
-    const empty = { feeds: [], articles: {}, feedWeights: {}, favorites: [], prefs: {}, podcasts: [], episodes: {} };
+    const empty = { feeds: [], articles: {}, feedWeights: {}, favorites: [], favoriteFeeds: [], prefs: {}, podcasts: [], episodes: {} };
     if (fs.existsSync(OPML_FILE)) {
       const parsed = parseOPML(OPML_FILE);
       const map = new Map(parsed.map(f => [f.url, f]));
@@ -137,7 +138,8 @@ ipcMain.handle('fetch-feed', async (_e, url) => {
       summary: i.contentSnippet || i.summary || '',
       content: i['content:encoded'] || i.content || '',
       isoDate: i.isoDate,
-      pubDate: i.pubDate
+      pubDate: i.pubDate,
+      feedTitle: feed.title
     }));
     const image = feed.image?.url || '';
     return { feedTitle: feed.title, items, image };
@@ -232,7 +234,7 @@ ipcMain.handle('fetch-bluesky', async (_e, handle) => {
       const id = post.uri.split('/').pop();
       const link = `https://bsky.app/profile/${author}/post/${id}`;
       const text = record.text || '';
-      const img = post.embed?.images?.[0]?.thumb || '';
+      const img = post.embed?.images?.[0]?.thumb || post.embed?.images?.[0]?.fullsize || '';
       return {
         title: text.slice(0, 50),
         link,
@@ -240,10 +242,12 @@ ipcMain.handle('fetch-bluesky', async (_e, handle) => {
         summary: text,
         content: text,
         isoDate: post.indexedAt,
-        pubDate: record.createdAt
+        pubDate: record.createdAt,
+        feedTitle: handle
       };
     });
-    return { feedTitle: handle, items };
+    const feedImage = json.feed?.[0]?.post?.author?.avatar || '';
+    return { feedTitle: handle, items, image: feedImage };
   } catch (e) {
     return { error: e.message, items: [] };
   }
