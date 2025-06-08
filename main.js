@@ -94,8 +94,8 @@ function loadData() {
   }
 }
 
-function saveData(data) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+async function saveData(data) {
+  await fs.promises.writeFile(DATA_FILE, JSON.stringify(data, null, 2));
 }
 
 function createWindow() {
