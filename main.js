@@ -9,24 +9,6 @@ const DATA_FILE = path.join(USER_DIR, 'data.json');
 const FEED_DIR = path.join(USER_DIR, 'feeds');
 const OPML_FILE = path.join(FEED_DIR, 'feeds.opml');
 
-function loadData() {
-  try {
-    const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    if (data.feeds.length === 0 && fs.existsSync(OPML_FILE)) {
-      data.feeds = parseOPML(OPML_FILE);
-      saveData(data);
-    }
-    return data;
-  } catch (e) {
-    const empty = { feeds: [], articles: [] };
-    if (fs.existsSync(OPML_FILE)) {
-      empty.feeds = parseOPML(OPML_FILE);
-      saveData(empty);
-    }
-    return empty;
-  }
-}
-
 function ensureFeedDir() {
   if (!fs.existsSync(FEED_DIR)) {
     fs.mkdirSync(FEED_DIR, { recursive: true });
@@ -45,6 +27,24 @@ function parseOPML(filePath) {
     return urls;
   } catch (e) {
     return [];
+  }
+}
+
+function loadData() {
+  try {
+    const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    if (data.feeds.length === 0 && fs.existsSync(OPML_FILE)) {
+      data.feeds = parseOPML(OPML_FILE);
+      saveData(data);
+    }
+    return data;
+  } catch (e) {
+    const empty = { feeds: [], articles: [] };
+    if (fs.existsSync(OPML_FILE)) {
+      empty.feeds = parseOPML(OPML_FILE);
+      saveData(empty);
+    }
+    return empty;
   }
 }
 
@@ -77,7 +77,9 @@ app.on('window-all-closed', () => {
 });
 
 ipcMain.handle('load-data', () => loadData());
+
 ipcMain.handle('save-data', (_e, data) => saveData(data));
+
 ipcMain.handle('fetch-feed', async (_e, url) => {
   const feed = await parser.parseURL(url);
   return feed.items.map(i => ({
@@ -99,4 +101,3 @@ ipcMain.handle('import-opml', async (_e, filePath) => {
   saveData(data);
   return data;
 });
-

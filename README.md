@@ -1,6 +1,6 @@
 # RSSimple
-
 Minimalist Electron RSS reader with glassmorphic design.
+
 
 ## Setup
 
@@ -19,4 +19,3 @@ Minimalist Electron RSS reader with glassmorphic design.
 - Fetch latest articles for each feed and show preview images when available.
 - Simple list view of articles with a modal reader.
 - Local JSON storage of feeds and articles so your subscriptions persist between runs.
-
