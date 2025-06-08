@@ -167,6 +167,18 @@ ipcMain.handle('fetch-podcast', async (_e, url) => {
   }
 });
 
+ipcMain.handle('search-podcasts', async (_e, term) => {
+  try {
+    const res = await fetch(
+      `https://itunes.apple.com/search?media=podcast&limit=5&term=${encodeURIComponent(term)}`
+    );
+    const json = await res.json();
+    return json.results.map(r => ({ title: r.collectionName, feedUrl: r.feedUrl }));
+  } catch {
+    return [];
+  }
+});
+
 ipcMain.handle('import-opml', async (_e, filePath) => {
   ensureFeedDir();
   fs.copyFileSync(filePath, OPML_FILE);

@@ -44,7 +44,7 @@ let state = {
 let filterText = '';
 let readerMode = false;
 let searchText = '';
-let rangeDays = 1;
+let rangeDays = 7;
 let currentFeed = '*';
 let currentArticles = [];
 let podcastMode = false;
@@ -548,23 +548,16 @@ addPodcastBtn.onclick = async () => {
   if (!input) return;
   let url = input;
   if (!/^https?:/i.test(input)) {
-    try {
-      const res = await fetch(
-        `https://itunes.apple.com/search?media=podcast&limit=5&term=${encodeURIComponent(input)}`
-      );
-      const j = await res.json();
-      if (!j.results.length) {
-        alert('No results');
-        return;
-      }
-      const choice = prompt(
-        j.results
-          .map((r, i) => `${i + 1}: ${r.collectionName}`)
-          .join('\n')
-      );
-      const idx = parseInt(choice, 10) - 1;
-      if (j.results[idx]) url = j.results[idx].feedUrl;
-    } catch {}
+    const results = await window.api.searchPodcasts(input);
+    if (!results.length) {
+      alert('No results');
+      return;
+    }
+    const choice = prompt(
+      results.map((r, i) => `${i + 1}: ${r.title}`).join('\n')
+    );
+    const idx = parseInt(choice, 10) - 1;
+    if (results[idx]) url = results[idx].feedUrl; else return;
   }
   if (!url) return;
   if (state.podcasts.some(p => p.url === url)) {
