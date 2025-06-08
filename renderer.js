@@ -112,6 +112,19 @@ function showNewsMode(on) {
   newsLibBtn.textContent = on ? 'Back to RSS' : 'News Library';
 }
 
+function renderSpinner(el) {
+  el.innerHTML = '<div class="spinner"></div>';
+}
+
+function clearSpinner(el) {
+  const sp = el.querySelector('.spinner');
+  if (sp) sp.remove();
+}
+
+function renderError(el, msg) {
+  el.innerHTML = `<div class="error">${msg}</div>`;
+}
+
 function normalizeFeeds(feeds) {
   return feeds.map(f => (typeof f === 'string' ? { url: f, title: '' } : f));
 }
