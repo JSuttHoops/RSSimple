@@ -150,9 +150,10 @@
 
     .feed-row button:not(.edit-feed):not(.del-feed) {
       flex: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      overflow: visible;
+      text-overflow: unset;
+      white-space: normal;
+      word-break: break-word;
     }
 
     .fav-feed {
