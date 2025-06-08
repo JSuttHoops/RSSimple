@@ -10,10 +10,7 @@ function buildTimeline(feeds, fetchFn, opts = {}) {
         const { feedTitle, items } = res.value;
         if (feedTitle && !feed.title) feed.title = feedTitle;
         perFeed[url] = items;
-        for (const item of items) {
-          if (feedTitle) item.feedTitle = feedTitle;
-          timeline.push(item);
-        }
+        for (const item of items) timeline.push(item);
       }
     }
     const seen = new Set();

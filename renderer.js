@@ -392,10 +392,6 @@ function updateArticleDisplay() {
 
 function renderArticles(articles) {
   articlesDiv.innerHTML = '';
-  if (!articles.length) {
-    articlesDiv.textContent = 'No articles found';
-    return;
-  }
   const frag = document.createDocumentFragment();
   articles.forEach(a => {
     const div = document.createElement('div');
@@ -845,19 +841,13 @@ async function fetchOgImage(url) {
   return ogCache[url];
 }
 
-let feedCtrl = null;
-
-function fetchAny(url, controller) {
-  let ctrl = controller;
-  if (!ctrl) {
-    if (feedCtrl) feedCtrl.abort();
-    feedCtrl = new AbortController();
-    ctrl = feedCtrl;
-  }
+function fetchAny(url) {
+  if (feedCtrl) feedCtrl.abort();
+  feedCtrl = new AbortController();
   if (url.startsWith('bsky:')) {
     return window.api.fetchBluesky(url.slice(5));
   }
-  return fetch(url, { signal: ctrl.signal }).then(res => {
+  return fetch(url, { signal: feedCtrl.signal }).then(res => {
     if (!res.ok) throw new Error(res.statusText);
     return res.text();
   }).then(parseXML);
@@ -873,14 +863,12 @@ async function prefetchAll() {
   const seen = new Set();
   const tasks = state.feeds.map(feed => {
     const url = feed.url || feed;
-    const ctrl = new AbortController();
-    return fetchAny(url, ctrl)
+    return fetchAny(url)
       .then(res => {
         if (res.error) return;
         if (res.feedTitle && !feed.title) feed.title = res.feedTitle;
         perFeed[url] = res.items;
         res.items.forEach(item => {
-          if (res.feedTitle) item.feedTitle = res.feedTitle;
           const id = item.guid || item.link;
           if (!seen.has(id)) {
             seen.add(id);
@@ -905,13 +893,10 @@ async function loadArticles(url) {
   state.feedWeights[url] = (state.feedWeights[url] || 0) + 1;
   let items = state.articles[url];
   try {
-    if (!items || !items.length) {
+    if (!items) {
       const result = await fetchAny(url);
       if (result.error) throw new Error(result.error);
       items = result.items.slice(0, 50);
-      if (result.feedTitle) {
-        items.forEach(it => { it.feedTitle = result.feedTitle; });
-      }
       await Promise.all(items.slice(0, 10).map(async itm => {
         if (!itm.image) itm.image = await fetchOgImage(itm.link);
       }));
@@ -1170,7 +1155,7 @@ favFeedsBtn.onclick = async () => {
   if (!state.favoriteFeeds.length) return;
   articlesDiv.innerHTML = '<div class="spinner"></div>';
   const list = state.feeds.filter(f => state.favoriteFeeds.includes(f.url || f));
-  const { timeline } = await window.buildTimeline(list, url => fetchAny(url, new AbortController()));
+  const { timeline } = await window.buildTimeline(list, fetchAny);
   currentFeed = 'favfeeds';
   currentArticles = timeline;
   setActiveFeedButton('favfeeds');
