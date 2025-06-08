@@ -26,5 +26,6 @@ Now includes a sidebar feed list with filtering and editable feed names.
 - Dark mode that follows system preference.
 - Weighted feed sorting based on how often you open a feed.
 - "All Recent" tab aggregates articles from the past week.
+- On startup, feeds are prefetched concurrently and "All Recent" loads by default.
 - Reader mode with adjustable font and background color.
 - Settings modal for customisation.

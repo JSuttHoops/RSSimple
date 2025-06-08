@@ -10,13 +10,25 @@ const toggleReader = document.getElementById('toggleReader');
 const fontSelect = document.getElementById('fontSelect');
 const bgColor = document.getElementById('bgColor');
 const allFeedsBtn = document.getElementById('allFeeds');
+const refreshAllBtn = document.getElementById('refreshAll');
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsModal = document.getElementById('settingsModal');
 const settingsContent = document.getElementById('settingsContent');
+allFeedsBtn.dataset.feed = '*';
 
 let state = { feeds: [], articles: {}, feedWeights: {}, prefs: {} };
 let filterText = '';
 let readerMode = false;
+
+function setActiveFeedButton(id) {
+  document.querySelectorAll('#feeds button, #allFeeds').forEach(b => {
+    b.classList.toggle('active', b.dataset.feed === id || (id === '*' && b.id === 'allFeeds'));
+  });
+}
+
+function applyTheme() {
+  document.body.dataset.theme = state.prefs.theme || 'system';
+}
 
 function normalizeFeeds(feeds) {
   return feeds.map(f => (typeof f === 'string' ? { url: f, title: '' } : f));
@@ -39,6 +51,7 @@ function renderFeeds() {
     row.className = 'feed-row';
     const btn = document.createElement('button');
     btn.textContent = title;
+    btn.dataset.feed = url;
     btn.onclick = () => loadArticles(url);
     const edit = document.createElement('button');
     edit.textContent = '✎';
@@ -151,8 +164,17 @@ async function fetchOgImage(url) {
   }
 }
 
+async function prefetchAll() {
+  articlesDiv.innerHTML = '<div class="spinner"></div>';
+  const { timeline, perFeed } = await window.buildTimeline(state.feeds, window.api.fetchFeed);
+  Object.assign(state.articles, perFeed, { '*': timeline });
+  await window.api.saveData(state);
+  renderArticles(timeline);
+  setActiveFeedButton('*');
+}
+
 async function loadArticles(url) {
-  articlesDiv.innerHTML = 'Loading...';
+  articlesDiv.innerHTML = '<div class="spinner"></div>';
   state.feedWeights[url] = (state.feedWeights[url] || 0) + 1;
   let items = state.articles[url];
   if (!items) {
@@ -174,6 +196,7 @@ async function loadArticles(url) {
   }
   await window.api.saveData(state);
   renderArticles(items);
+  setActiveFeedButton(url);
 }
 
 addFeedsBtn.onclick = () => {
@@ -200,39 +223,53 @@ opmlInput.onchange = async () => {
   state.articles = data.articles || {};
   state.feedWeights = data.feedWeights || {};
   state.prefs = data.prefs || {};
+  applyTheme();
   renderFeeds();
+  if (!state.articles['*'] && state.feeds.length) {
+    await prefetchAll();
+  }
+  const def = state.prefs.defaultFeed || '*';
+  if (def === '*') {
+    if (state.articles['*']) {
+      renderArticles(state.articles['*']);
+      setActiveFeedButton('*');
+    }
+  } else {
+    await loadArticles(def);
+  }
 })();
 
-allFeedsBtn.onclick = async () => {
-  articlesDiv.innerHTML = 'Loading...';
-  const all = [];
-  for (const feed of state.feeds) {
-    const url = feed.url || feed;
-    if (!state.articles[url]) {
-      await loadArticles(url);
-    }
-    const items = state.articles[url] || [];
-    for (const item of items) {
-      all.push(item);
-    }
+allFeedsBtn.onclick = () => {
+  if (state.articles['*']) {
+    renderArticles(state.articles['*']);
+    setActiveFeedButton('*');
+  } else {
+    prefetchAll();
   }
-  const week = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const recent = all.filter(a => new Date(a.isoDate || a.pubDate || 0).getTime() > week);
-  recent.sort((a, b) => new Date(b.isoDate || b.pubDate || 0) - new Date(a.isoDate || a.pubDate || 0));
-  renderArticles(recent);
+};
+
+refreshAllBtn.onclick = () => {
+  prefetchAll();
 };
 
 settingsBtn.onclick = () => {
   settingsContent.innerHTML = `<h3>Settings</h3>
     <div>Font: <select id="setFont"><option value="sans-serif">Sans</option><option value="serif">Serif</option></select></div>
     <div>Background: <input type="color" id="setBg" value="${state.prefs.bg || '#ffffff'}"/></div>
+    <div>Theme: <select id="themeSel"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></div>
+    <div>Default Feed: <select id="defaultFeed"><option value="*">All Recent</option>${state.feeds.map(f => `<option value="${f.url}">${f.title || f.url}</option>`).join('')}</select></div>
     <button id="closeSettings">Close</button>`;
   settingsModal.style.display = 'flex';
   document.getElementById('setFont').value = state.prefs.font || 'sans-serif';
+  document.getElementById('themeSel').value = state.prefs.theme || 'system';
+  document.getElementById('defaultFeed').value = state.prefs.defaultFeed || '*';
   document.getElementById('closeSettings').onclick = () => {
     state.prefs.font = document.getElementById('setFont').value;
     state.prefs.bg = document.getElementById('setBg').value;
+    state.prefs.theme = document.getElementById('themeSel').value;
+    state.prefs.defaultFeed = document.getElementById('defaultFeed').value;
     settingsModal.style.display = 'none';
+    applyTheme();
     window.api.saveData(state);
   };
 };
