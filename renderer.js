@@ -67,6 +67,15 @@ let currentPodcast = null;
 let currentEpisodes = [];
 let newsMode = false;
 
+let saveTimer = null;
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    window.api.saveData(state);
+    saveTimer = null;
+  }, 500);
+}
+
 function setActiveFeedButton(id) {
   document.querySelectorAll('#feeds button, #allFeeds').forEach(b => {
     b.classList.toggle('active', b.dataset.feed === id || (id === '*' && b.id === 'allFeeds'));
@@ -143,7 +152,7 @@ function renderFeeds() {
       const val = prompt('Feed Name', title);
       if (val) {
         feed.title = val;
-        window.api.saveData(state);
+        scheduleSave();
         renderFeeds();
       }
     };
@@ -155,7 +164,7 @@ function renderFeeds() {
       if (confirm('Remove feed?')) {
         state.feeds = state.feeds.filter(f => (f.url || f) !== url);
         delete state.articles[url];
-        window.api.saveData(state);
+        scheduleSave();
         renderFeeds();
       }
     };
@@ -190,6 +199,7 @@ function renderPodcasts() {
     if (p.image) {
       const img = document.createElement('img');
       img.src = p.image;
+      img.loading = 'lazy';
       img.style.width = '24px';
       img.style.height = '24px';
       img.style.objectFit = 'cover';
@@ -214,7 +224,7 @@ function renderPodcasts() {
       const reader = new FileReader();
       reader.onload = () => {
         p.image = reader.result;
-        window.api.saveData(state);
+        scheduleSave();
         renderPodcasts();
       };
       reader.readAsDataURL(file);
@@ -236,7 +246,7 @@ function renderPodcasts() {
         if (state.episodes[p.url]) {
           state.episodes[p.url].forEach(ep => { ep.image = dataUrl; });
         }
-        window.api.saveData(state);
+        scheduleSave();
         if (currentPodcast === p.url) renderEpisodes(filterArticles(state.episodes[p.url] || []));
       };
       reader.readAsDataURL(file);
@@ -249,7 +259,7 @@ function renderPodcasts() {
       if (confirm('Remove podcast?')) {
         state.podcasts = state.podcasts.filter(f => f.url !== p.url);
         delete state.episodes[p.url];
-        window.api.saveData(state);
+        scheduleSave();
         renderPodcasts();
       }
     };
@@ -278,6 +288,7 @@ function renderNewsLibrary() {
     if (feed.image) {
       const img = document.createElement('img');
       img.src = feed.image;
+      img.loading = 'lazy';
       tile.appendChild(img);
     } else {
       const def = document.createElement('div');
@@ -300,7 +311,7 @@ function renderNewsLibrary() {
       const reader = new FileReader();
       reader.onload = () => {
         feed.image = reader.result;
-        window.api.saveData(state);
+        scheduleSave();
         renderNewsLibrary();
       };
       reader.readAsDataURL(file);
@@ -515,7 +526,7 @@ async function showArticle(a) {
   webview.src = a.link;
   modalContent.querySelector('#webContainer').style.display = 'none';
   state.read[a.link] = true;
-  window.api.saveData(state);
+  scheduleSave();
 }
 
 function showOfflineItem(item) {
@@ -631,7 +642,7 @@ function showFeedSearch() {
             }
             state.feeds.push({ url: item.url, title: res.feedTitle || item.title, image: res.image });
             state.articles[item.url] = res.items;
-            await window.api.saveData(state);
+            scheduleSave();
             renderFeeds();
             add.textContent = 'Added';
           };
@@ -698,7 +709,7 @@ async function downloadArticle(a) {
     file,
     type: 'article'
   });
-  window.api.saveData(state);
+  scheduleSave();
   alert(`Saved to ${file}`);
 }
 
@@ -710,7 +721,7 @@ async function downloadEpisode(ep) {
     file,
     type: 'episode'
   });
-  window.api.saveData(state);
+  scheduleSave();
   alert(`Saved to ${file}`);
 }
 
@@ -733,7 +744,7 @@ async function toggleFavorite(a, btn) {
     state.favorites.push({ ...a, offline: file });
     btn.textContent = '★';
   }
-  window.api.saveData(state);
+  scheduleSave();
 }
 
 function isFavoriteFeed(url) {
@@ -748,7 +759,7 @@ function toggleFeedFavorite(url, btn) {
     state.favoriteFeeds.push(url);
     btn.textContent = '★';
   }
-  window.api.saveData(state);
+  scheduleSave();
 }
 
 function showAudioPlayer(ep) {
@@ -844,13 +855,37 @@ function fetchAny(url) {
 
 async function prefetchAll() {
   articlesDiv.innerHTML = '<div class="spinner"></div>';
-  const { timeline, perFeed } = await window.buildTimeline(state.feeds, fetchAny);
-  Object.assign(state.articles, perFeed, { '*': timeline });
-  await window.api.saveData(state);
   currentFeed = '*';
-  currentArticles = timeline;
-  updateArticleDisplay();
+  currentArticles = [];
   setActiveFeedButton('*');
+  const timeline = [];
+  const perFeed = {};
+  const seen = new Set();
+  const tasks = state.feeds.map(feed => {
+    const url = feed.url || feed;
+    return fetchAny(url)
+      .then(res => {
+        if (res.error) return;
+        if (res.feedTitle && !feed.title) feed.title = res.feedTitle;
+        perFeed[url] = res.items;
+        res.items.forEach(item => {
+          const id = item.guid || item.link;
+          if (!seen.has(id)) {
+            seen.add(id);
+            timeline.push(item);
+          }
+        });
+        timeline.sort((a, b) => new Date(b.isoDate || b.pubDate || 0) - new Date(a.isoDate || a.pubDate || 0));
+        state.articles[url] = res.items;
+        state.articles['*'] = timeline;
+        currentArticles = timeline;
+        updateArticleDisplay();
+      })
+      .catch(() => {});
+  });
+  await Promise.allSettled(tasks);
+  renderFeeds();
+  scheduleSave();
 }
 
 async function loadArticles(url) {
@@ -872,7 +907,7 @@ async function loadArticles(url) {
         if (result.image) feed.image = result.image;
         renderFeeds();
       }
-      await window.api.saveData(state);
+      scheduleSave();
     }
     currentFeed = url;
     currentArticles = items;
@@ -906,7 +941,7 @@ async function loadEpisodes(url) {
       if (result.image) pod.image = result.image;
     }
     state.episodes[url] = items;
-    await window.api.saveData(state);
+    scheduleSave();
     renderPodcasts();
   }
   currentPodcast = url;
@@ -944,7 +979,7 @@ addFeedBtn.onclick = async () => {
   }
   state.feeds.push({ url, title: res.feedTitle || url, image: res.image });
   state.articles[url] = res.items;
-  await window.api.saveData(state);
+  scheduleSave();
   renderFeeds();
 };
 
@@ -977,7 +1012,7 @@ addPodcastBtn.onclick = async () => {
   }
   state.podcasts.push({ url, title: res.feedTitle || url, image: res.image });
   state.episodes[url] = res.items;
-  await window.api.saveData(state);
+  scheduleSave();
   renderPodcasts();
 };
 
@@ -1152,18 +1187,24 @@ settingsBtn.onclick = () => {
     settingsModal.style.display = 'none';
     applyTheme();
     applyLayout();
-    window.api.saveData(state);
+    scheduleSave();
   };
 };
 
 fontSelect.onchange = () => {
   state.prefs.font = fontSelect.value;
   applyReaderPrefs();
-  window.api.saveData(state);
+  scheduleSave();
 };
 
 bgColor.oninput = () => {
   state.prefs.bg = bgColor.value;
   applyReaderPrefs();
-  window.api.saveData(state);
+  scheduleSave();
 };
+
+window.addEventListener('beforeunload', () => {
+  if (saveTimer) {
+    window.api.saveData(state);
+  }
+});
