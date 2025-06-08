@@ -5,4 +5,5 @@ contextBridge.exposeInMainWorld('api', {
   saveData: (data) => ipcRenderer.invoke('save-data', data),
   fetchFeed: (url) => ipcRenderer.invoke('fetch-feed', url),
   importOpml: (file) => ipcRenderer.invoke('import-opml', file),
+  downloadArticle: (info) => ipcRenderer.invoke('download-article', info),
 });
