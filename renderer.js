@@ -177,9 +177,37 @@ function renderPodcasts() {
   state.podcasts.forEach(p => {
     const row = document.createElement('div');
     row.className = 'feed-row';
+    if (p.image) {
+      const img = document.createElement('img');
+      img.src = p.image;
+      img.style.width = '24px';
+      img.style.height = '24px';
+      img.style.objectFit = 'cover';
+      img.style.borderRadius = '4px';
+      row.appendChild(img);
+    }
     const btn = document.createElement('button');
     btn.textContent = p.title || p.url;
     btn.onclick = () => loadEpisodes(p.url);
+    const imgBtn = document.createElement('button');
+    imgBtn.textContent = '✎';
+    imgBtn.className = 'img-btn';
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.style.display = 'none';
+    imgBtn.onclick = (e) => { e.stopPropagation(); input.click(); };
+    input.onchange = () => {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        p.image = reader.result;
+        window.api.saveData(state);
+        renderPodcasts();
+      };
+      reader.readAsDataURL(file);
+    };
     const del = document.createElement('button');
     del.textContent = '✖';
     del.className = 'del-feed';
@@ -193,6 +221,8 @@ function renderPodcasts() {
       }
     };
     row.appendChild(btn);
+    row.appendChild(imgBtn);
+    row.appendChild(input);
     row.appendChild(del);
     podcastFeedsDiv.appendChild(row);
   });
@@ -372,7 +402,7 @@ function renderOffline(list) {
     open.textContent = item.type === 'episode' ? 'Play' : 'Open';
     open.onclick = (e) => {
       e.stopPropagation();
-      window.api.openLink('file://' + item.file);
+      showOfflineItem(item);
     };
     btns.appendChild(open);
     div.appendChild(btns);
@@ -412,7 +442,7 @@ async function showArticle(a) {
     imgPart +
     `<div class="reader" data-raw="" data-link="${a.link}"></div>` +
     `<div id="webContainer" style="display:none;width:100%;height:80vh;">
-       <iframe src="" style="width:100%;height:100%;border:0"></iframe>
+       <webview src="" style="width:100%;height:100%;border:0"></webview>
      </div>`;
   const readerDiv = modalContent.querySelector('.reader');
   readerDiv.dataset.raw = content;
@@ -427,9 +457,29 @@ async function showArticle(a) {
   modalContent.onclick = (e) => e.stopPropagation();
   readerMode = !!parsed;
   webViewMode = false;
-  const iframe = modalContent.querySelector('#webContainer iframe');
-  iframe.src = a.link;
+  const webview = modalContent.querySelector('#webContainer webview');
+  webview.src = a.link;
   modalContent.querySelector('#webContainer').style.display = 'none';
+}
+
+function showOfflineItem(item) {
+  if (item.type === 'episode') {
+    playEpisode({
+      title: item.title,
+      audio: 'file://' + item.file,
+      image: item.image || ''
+    });
+    return;
+  }
+  modalContent.innerHTML =
+    `<iframe src="file://${item.file}" style="width:100%;height:80vh;border:0"></iframe>`;
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  modal.onclick = () => {
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+  };
+  modalContent.onclick = (e) => e.stopPropagation();
 }
 
 function textColorFor(hex) {
@@ -908,19 +958,19 @@ opmlInput.onchange = async () => {
   renderFeeds();
   renderPodcasts();
   renderNewsLibrary();
-  if (!state.articles['*'] && state.feeds.length) {
-    await prefetchAll();
-  }
   const def = state.prefs.defaultFeed || '*';
   if (def === '*') {
+    currentFeed = '*';
     if (state.articles['*']) {
-      currentFeed = '*';
       currentArticles = state.articles['*'];
       updateArticleDisplay();
-      setActiveFeedButton('*');
+    } else if (state.feeds.length) {
+      prefetchAll();
     }
+    setActiveFeedButton('*');
   } else {
-    await loadArticles(def);
+    loadArticles(def);
+    if (state.feeds.length) prefetchAll();
   }
 })();
 
