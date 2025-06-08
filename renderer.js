@@ -325,15 +325,29 @@ function renderArticles(articles) {
 }
 
 async function showArticle(a) {
-  let content = a.content;
-  if (!content) {
+  let raw = a.content;
+  if (!raw) {
     try {
       const res = await fetch(a.link);
-      content = await res.text();
+      raw = await res.text();
     } catch {
-      content = `<p><a href="${a.link}" target="_blank">Open Link</a></p>`;
+      raw = null;
     }
   }
+  let parsed = null;
+  try {
+    parsed = await window.api.parseReader(a.link);
+  } catch {}
+  if (!raw && !parsed) {
+    try {
+      const alt = await fetch(`https://r.jina.ai/${a.link}`);
+      parsed = await alt.text();
+    } catch {}
+  }
+  if (!raw && !parsed) {
+    raw = `<p><a href="${a.link}" target="_blank">Open Link</a></p>`;
+  }
+  const content = parsed || raw;
   const imgPart = a.image
     ? `<img src="${a.image}" style="max-width:100%;margin-bottom:8px;"/>`
     : '';
@@ -346,9 +360,13 @@ async function showArticle(a) {
   readerDiv.innerHTML = content;
   applyReaderPrefs();
   modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
   modal.onclick = () => {
     modal.style.display = 'none';
+    document.body.style.overflow = '';
   };
+  modalContent.onclick = (e) => e.stopPropagation();
+  readerMode = !!parsed;
 }
 
 function textColorFor(hex) {
@@ -526,7 +544,28 @@ addFeedBtn.onclick = async () => {
 };
 
 addPodcastBtn.onclick = async () => {
-  const url = prompt('Podcast RSS URL');
+  const input = prompt('Podcast RSS URL or search term');
+  if (!input) return;
+  let url = input;
+  if (!/^https?:/i.test(input)) {
+    try {
+      const res = await fetch(
+        `https://itunes.apple.com/search?media=podcast&limit=5&term=${encodeURIComponent(input)}`
+      );
+      const j = await res.json();
+      if (!j.results.length) {
+        alert('No results');
+        return;
+      }
+      const choice = prompt(
+        j.results
+          .map((r, i) => `${i + 1}: ${r.collectionName}`)
+          .join('\n')
+      );
+      const idx = parseInt(choice, 10) - 1;
+      if (j.results[idx]) url = j.results[idx].feedUrl;
+    } catch {}
+  }
   if (!url) return;
   if (state.podcasts.some(p => p.url === url)) {
     alert('Podcast already exists');
