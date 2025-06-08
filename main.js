@@ -17,14 +17,24 @@ function ensureFeedDir() {
 
 function parseOPML(filePath) {
   try {
-    const parser = require('fast-xml-parser');
+    const { XMLParser } = require('fast-xml-parser');
     const text = fs.readFileSync(filePath, 'utf8');
+    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
     const data = parser.parse(text);
-    const outlines = data.opml.body.outline;
-    const urls = Array.isArray(outlines)
-      ? outlines.map(o => o['@_xmlUrl']).filter(Boolean)
-      : [outlines['@_xmlUrl']];
-    return urls;
+    const collect = (node) => {
+      let arr = [];
+      if (!node) return arr;
+      if (Array.isArray(node)) {
+        for (const n of node) arr = arr.concat(collect(n));
+        return arr;
+      }
+      if (typeof node === 'object') {
+        if (node['@_xmlUrl']) arr.push(node['@_xmlUrl']);
+        if (node.outline) arr = arr.concat(collect(node.outline));
+      }
+      return arr;
+    };
+    return collect(data.opml?.body?.outline);
   } catch (e) {
     return [];
   }
@@ -34,14 +44,14 @@ function loadData() {
   try {
     const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     if (data.feeds.length === 0 && fs.existsSync(OPML_FILE)) {
-      data.feeds = parseOPML(OPML_FILE);
+      data.feeds = Array.from(new Set(parseOPML(OPML_FILE)));
       saveData(data);
     }
     return data;
   } catch (e) {
     const empty = { feeds: [], articles: [] };
     if (fs.existsSync(OPML_FILE)) {
-      empty.feeds = parseOPML(OPML_FILE);
+      empty.feeds = Array.from(new Set(parseOPML(OPML_FILE)));
       saveData(empty);
     }
     return empty;
