@@ -890,8 +890,10 @@ async function prefetchAll() {
         timeline.sort((a, b) => new Date(b.isoDate || b.pubDate || 0) - new Date(a.isoDate || a.pubDate || 0));
         state.articles[url] = res.items;
         state.articles['*'] = timeline;
-        currentArticles = timeline;
-        updateArticleDisplay();
+        if (currentFeed === '*') {
+          currentArticles = timeline;
+          updateArticleDisplay();
+        }
       })
       .catch(() => {});
   });
