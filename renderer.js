@@ -52,7 +52,8 @@ let state = {
   prefs: {},
   podcasts: [],
   episodes: {},
-  offline: []
+  offline: [],
+  read: {}
 };
 let filterText = '';
 let readerMode = false;
@@ -123,7 +124,7 @@ function renderFeeds() {
     const row = document.createElement('div');
     row.className = 'feed-row';
     const star = document.createElement('button');
-    star.className = 'fav-feed feed-btn';
+    star.className = 'fav-feed feed-btn btn';
     star.textContent = state.favoriteFeeds.includes(url) ? '★' : '☆';
     star.onclick = (e) => {
       e.stopPropagation();
@@ -201,7 +202,7 @@ function renderPodcasts() {
     btn.onclick = () => loadEpisodes(p.url);
     const imgBtn = document.createElement('button');
     imgBtn.textContent = '✎';
-    imgBtn.className = 'img-btn feed-btn';
+    imgBtn.className = 'img-btn feed-btn btn';
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -321,6 +322,7 @@ function renderEpisodes(list) {
     if (ep.image) {
       const img = document.createElement('img');
       img.src = ep.image;
+      img.loading = 'lazy';
       div.appendChild(img);
     }
     const title = document.createElement('div');
@@ -383,9 +385,11 @@ function renderArticles(articles) {
   articles.forEach(a => {
     const div = document.createElement('div');
     div.className = 'article';
+    if (state.read[a.link]) div.classList.add('read');
     if (a.image) {
       const img = document.createElement('img');
       img.src = a.image;
+      img.loading = 'lazy';
       div.appendChild(img);
     }
     const title = document.createElement('div');
@@ -408,7 +412,7 @@ function renderArticles(articles) {
     const btns = document.createElement('div');
     btns.className = 'article-buttons';
     const starBtn = document.createElement('button');
-    starBtn.className = 'star-btn article-btn';
+    starBtn.className = 'star-btn article-btn btn';
     starBtn.textContent = isFavorite(a.link) ? '★' : '☆';
     starBtn.onclick = (e) => { e.stopPropagation(); toggleFavorite(a, starBtn); };
     const readBtn = document.createElement('button');
@@ -485,7 +489,7 @@ async function showArticle(a) {
   }
   const content = parsed || raw;
   const imgPart = a.image
-    ? `<img src="${a.image}" style="max-width:100%;margin-bottom:8px;"/>`
+    ? `<img src="${a.image}" loading="lazy" style="max-width:100%;max-height:400px;margin-bottom:8px;"/>`
     : '';
   modalContent.innerHTML =
     `<h2>${sanitize(a.title)}</h2>` +
@@ -510,6 +514,8 @@ async function showArticle(a) {
   const webview = modalContent.querySelector('#webContainer webview');
   webview.src = a.link;
   modalContent.querySelector('#webContainer').style.display = 'none';
+  state.read[a.link] = true;
+  window.api.saveData(state);
 }
 
 function showOfflineItem(item) {
@@ -794,6 +800,21 @@ function showAudioPlayer(ep) {
 }
 const ogCache = {};
 
+function parseXML(text) {
+  const doc = new DOMParser().parseFromString(text, 'text/xml');
+  const feedTitle = doc.querySelector('channel>title')?.textContent || '';
+  const image = doc.querySelector('channel>image>url')?.textContent || '';
+  const items = Array.from(doc.querySelectorAll('item')).map(it => ({
+    title: it.querySelector('title')?.textContent || '',
+    link: it.querySelector('link')?.textContent || '',
+    summary: it.querySelector('description')?.textContent || '',
+    isoDate: it.querySelector('pubDate')?.textContent || '',
+    content: it.querySelector('content\\:encoded')?.textContent || '',
+    image: it.querySelector('enclosure')?.getAttribute('url') || ''
+  }));
+  return { feedTitle, items, image };
+}
+
 async function fetchOgImage(url) {
   if (ogCache[url]) return ogCache[url];
   ogCache[url] = (async () => {
@@ -810,10 +831,15 @@ async function fetchOgImage(url) {
 }
 
 function fetchAny(url) {
+  if (feedCtrl) feedCtrl.abort();
+  feedCtrl = new AbortController();
   if (url.startsWith('bsky:')) {
     return window.api.fetchBluesky(url.slice(5));
   }
-  return window.api.fetchFeed(url);
+  return fetch(url, { signal: feedCtrl.signal }).then(res => {
+    if (!res.ok) throw new Error(res.statusText);
+    return res.text();
+  }).then(parseXML);
 }
 
 async function prefetchAll() {
@@ -828,35 +854,36 @@ async function prefetchAll() {
 }
 
 async function loadArticles(url) {
-  articlesDiv.innerHTML = '<div class="spinner"></div>';
+  renderSpinner(articlesDiv);
   state.feedWeights[url] = (state.feedWeights[url] || 0) + 1;
   let items = state.articles[url];
-  if (!items) {
-    const result = await fetchAny(url);
-    if (result.error) {
-      alert('Failed to fetch feed: ' + result.error);
-      articlesDiv.innerHTML = '';
-      return;
+  try {
+    if (!items) {
+      const result = await fetchAny(url);
+      if (result.error) throw new Error(result.error);
+      items = result.items.slice(0, 50);
+      await Promise.all(items.slice(0, 10).map(async itm => {
+        if (!itm.image) itm.image = await fetchOgImage(itm.link);
+      }));
+      state.articles[url] = items;
+      const feed = state.feeds.find(f => (f.url || f) === url);
+      if (feed) {
+        if (result.feedTitle) feed.title = result.feedTitle;
+        if (result.image) feed.image = result.image;
+        renderFeeds();
+      }
+      await window.api.saveData(state);
     }
-    items = result.items;
-    // Attempt to fetch open graph images for items missing a preview
-    await Promise.all(items.slice(0, 10).map(async itm => {
-      if (!itm.image) itm.image = await fetchOgImage(itm.link);
-    }));
-    state.articles[url] = items;
-    const feed = state.feeds.find(f => (f.url || f) === url);
-    if (feed) {
-      if (result.feedTitle) feed.title = result.feedTitle;
-      if (result.image) feed.image = result.image;
-      renderFeeds();
-    }
-    await window.api.saveData(state);
+    currentFeed = url;
+    currentArticles = items;
+    updateArticleDisplay();
+    setActiveFeedButton(url);
+  } catch (e) {
+    console.error('loadArticles', e);
+    renderError(articlesDiv, 'Failed to load feed');
+  } finally {
+    clearSpinner(articlesDiv);
   }
-  await window.api.saveData(state);
-  currentFeed = url;
-  currentArticles = items;
-  updateArticleDisplay();
-  setActiveFeedButton(url);
 }
 
 async function loadEpisodes(url) {
@@ -959,9 +986,13 @@ filterInput.oninput = () => {
   renderFeeds();
 };
 
-searchInput.oninput = () => {
-  searchText = searchInput.value.toLowerCase();
-  updateArticleDisplay();
+let searchTimer = null;
+searchInput.onkeyup = () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    searchText = searchInput.value.toLowerCase();
+    updateArticleDisplay();
+  }, 150);
 };
 
 rangeSelect.onchange = () => {
@@ -1000,11 +1031,12 @@ opmlInput.onchange = async () => {
   if (!file) return;
   state = await window.api.importOpml(file.path);
   state.feeds = normalizeFeeds(state.feeds || []);
+  if (!state.read) state.read = {};
   renderFeeds();
   opmlInput.value = '';
 };
 
-(async () => {
+window.addEventListener('DOMContentLoaded', async () => {
   const data = await window.api.loadData();
   state.feeds = normalizeFeeds(data.feeds || []);
   state.articles = data.articles || {};
@@ -1015,6 +1047,7 @@ opmlInput.onchange = async () => {
   state.podcasts = data.podcasts || [];
   state.episodes = data.episodes || {};
   state.offline = data.offline || [];
+  state.read = data.read || {};
   applyTheme();
   applyLayout();
   showPodcastMode(false);
@@ -1036,7 +1069,7 @@ opmlInput.onchange = async () => {
     loadArticles(def);
     if (state.feeds.length) prefetchAll();
   }
-})();
+});
 
 allFeedsBtn.onclick = () => {
   if (state.articles['*']) {
