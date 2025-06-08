@@ -33,6 +33,7 @@ const newsSearch = document.getElementById('newsSearch');
 const newsLibraryDiv = document.getElementById('newsLibrary');
 const audioModal = document.getElementById('audioModal');
 const audioContent = document.getElementById('audioContent');
+const exploreBtn = document.getElementById('exploreBtn');
 const rssControls = document.getElementById('rssControls');
 const podcastControls = document.getElementById('podcastControls');
 allFeedsBtn.dataset.feed = '*';
@@ -445,6 +446,62 @@ function showPrompt(label, placeholder = '') {
   });
 }
 
+function showFeedSearch() {
+  return new Promise((res) => {
+    dialogContent.innerHTML = `<div>` +
+      `<input id="feedSearchTerm" style="width:100%;margin-bottom:8px;" placeholder="Search feeds"/>` +
+      `<div id="feedResults" style="max-height:300px;overflow:auto;margin-bottom:8px;"></div>` +
+      `<div style="display:flex;gap:6px;justify-content:flex-end;">` +
+      `<button id="closeExplore">Close</button>` +
+      `</div></div>`;
+    dialogModal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    const termInput = document.getElementById('feedSearchTerm');
+    const resultsDiv = document.getElementById('feedResults');
+    const close = () => {
+      dialogModal.style.display = 'none';
+      document.body.style.overflow = '';
+      res();
+    };
+    document.getElementById('closeExplore').onclick = close;
+    dialogModal.onclick = close;
+    dialogContent.onclick = (e) => e.stopPropagation();
+    termInput.onkeypress = async (e) => {
+      if (e.key === 'Enter') {
+        resultsDiv.textContent = 'Searching...';
+        const list = await window.api.searchFeeds(termInput.value);
+        resultsDiv.innerHTML = '';
+        list.forEach(item => {
+          const row = document.createElement('div');
+          row.style.display = 'flex';
+          row.style.justifyContent = 'space-between';
+          row.style.marginBottom = '4px';
+          const title = document.createElement('span');
+          title.textContent = item.title;
+          const add = document.createElement('button');
+          add.textContent = 'Add';
+          add.onclick = async () => {
+            const res = await window.api.fetchFeed(item.url);
+            if (res.error) {
+              alert('Failed to add feed: ' + res.error);
+              return;
+            }
+            state.feeds.push({ url: item.url, title: res.feedTitle || item.title, image: res.image });
+            state.articles[item.url] = res.items;
+            await window.api.saveData(state);
+            renderFeeds();
+            add.textContent = 'Added';
+          };
+          row.appendChild(title);
+          row.appendChild(add);
+          resultsDiv.appendChild(row);
+        });
+      }
+    };
+    termInput.focus();
+  });
+}
+
 function isBluesky(url) {
   return /^@/.test(url) || /bsky\.(app|social)/i.test(url);
 }
@@ -544,11 +601,34 @@ function showAudioPlayer(ep) {
     img.src = ep.image;
     audioContent.appendChild(img);
   }
+  const title = document.createElement('h3');
+  title.textContent = ep.title;
+  audioContent.appendChild(title);
   const audio = document.createElement('audio');
   audio.controls = true;
   audio.src = ep.audio;
   audio.autoplay = true;
   audioContent.appendChild(audio);
+  const idx = currentEpisodes.indexOf(ep);
+  const nav = document.createElement('div');
+  nav.className = 'player-nav';
+  const prev = document.createElement('button');
+  prev.textContent = '◀';
+  prev.disabled = idx <= 0;
+  prev.onclick = (e) => { e.stopPropagation(); if (idx > 0) playEpisode(currentEpisodes[idx - 1]); };
+  const next = document.createElement('button');
+  next.textContent = '▶';
+  next.disabled = idx >= currentEpisodes.length - 1;
+  next.onclick = (e) => { e.stopPropagation(); if (idx < currentEpisodes.length - 1) playEpisode(currentEpisodes[idx + 1]); };
+  nav.appendChild(prev);
+  nav.appendChild(next);
+  audioContent.appendChild(nav);
+  if (ep.transcript) {
+    const tr = document.createElement('pre');
+    tr.className = 'transcript';
+    tr.textContent = ep.transcript;
+    audioContent.appendChild(tr);
+  }
   audioModal.style.display = 'flex';
   document.body.style.overflow = 'hidden';
   audioModal.onclick = () => {
@@ -634,6 +714,11 @@ async function loadEpisodes(url) {
       return;
     }
     items = result.items;
+    for (const ep of items.slice(0, 5)) {
+      if (!ep.image) {
+        ep.image = await fetchOgImage(ep.link);
+      }
+    }
     const pod = state.podcasts.find(p => p.url === url);
     if (pod) {
       if (result.feedTitle) pod.title = result.feedTitle;
@@ -820,6 +905,10 @@ podcastLibBtn.onclick = () => {
 newsLibBtn.onclick = () => {
   showNewsMode(!newsMode);
   if (newsMode) renderNewsLibrary();
+};
+
+exploreBtn.onclick = () => {
+  showFeedSearch();
 };
 
 newsSearch.oninput = () => {
