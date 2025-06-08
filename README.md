@@ -1,6 +1,6 @@
 # RSSimple
 
-Minimalist Electron RSS reader.
+Minimalist Electron RSS reader with glassmorphic design.
 
 ## Setup
 
@@ -15,7 +15,7 @@ Minimalist Electron RSS reader.
 
 ## Features
 
-- Upload `feeds.opml` to import RSS feed URLs.
+- Click **Upload OPML** to choose a `feeds.opml` file and import RSS feed URLs.
 - Fetch latest articles for each feed.
 - Simple list view of articles.
 - Local JSON storage of feeds and articles.

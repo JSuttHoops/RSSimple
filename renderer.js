@@ -40,7 +40,11 @@ async function loadArticles(url) {
   renderArticles(items);
 }
 
-addFeedsBtn.onclick = async () => {
+addFeedsBtn.onclick = () => {
+  opmlInput.click();
+};
+
+opmlInput.onchange = async () => {
   const file = opmlInput.files[0];
   if (!file) return;
   const text = await file.text();
@@ -51,6 +55,7 @@ addFeedsBtn.onclick = async () => {
   state.feeds.push(...urls);
   renderFeeds();
   await window.api.saveData(state);
+  opmlInput.value = '';
 };
 
 (async () => {
