@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const RSSParser = require('rss-parser');
@@ -98,8 +98,9 @@ function saveData(data) {
 }
 
 function createWindow() {
+  const { width } = screen.getPrimaryDisplay().workAreaSize;
   const win = new BrowserWindow({
-    width: 1200,
+    width: Math.round(width * 0.7),
     height: 800,
     minWidth: 800,
     minHeight: 600,
