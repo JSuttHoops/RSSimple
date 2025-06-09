@@ -829,7 +829,12 @@ async function showAiSearch() {
       const query = document.getElementById('aiQuery').value.trim();
       if (!query) return;
       const model = sel.value;
-      const all = Object.values(state.articles).flat();
+      const hasDate = /\b(?:today|yesterday|week|month|year|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|\d{4})\b/i.test(query);
+      let all = Object.values(state.articles).flat();
+      if (!hasDate) {
+        const start = Date.now() - 7 * 86400000;
+        all = all.filter(a => new Date(a.isoDate || a.pubDate || 0).getTime() >= start);
+      }
       const docs = all.slice(0, 200).map((a, i) => {
         const date = (a.isoDate || a.pubDate || '').slice(0, 10);
         const cats = (a.categories || []).join(', ');
@@ -837,7 +842,7 @@ async function showAiSearch() {
         return `${i + 1}. "${a.title}"${meta ? ` (${meta})` : ''}`;
       }).join('\n');
       const prompt =
-        `You are a search assistant. Below is a numbered list of articles. Reply with a comma-separated list of the numbers that best answer the question or "none".\nArticles:\n${docs}\nQuestion: ${query}`;
+        `You are a search assistant. Focus mainly on matching the article titles to the question. Below is a numbered list of articles. Reply with a comma-separated list of the numbers that best answer the question or "none".\nArticles:\n${docs}\nQuestion: ${query}`;
       const resultEl = document.getElementById('aiResult');
       resultEl.textContent = 'Thinking...';
       const out = await window.api.ollamaQuery({ model, prompt });
