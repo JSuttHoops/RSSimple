@@ -355,9 +355,11 @@
       transform: translateX(-50%);
       display: flex;
       gap: 8px;
-      background: rgba(255, 255, 255, 0.6);
-      padding: 4px 8px;
-      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.5);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      padding: 6px 10px;
+      border-radius: 10px;
     }
 
     .modal {
@@ -374,8 +376,10 @@
     }
 
     .modal-content {
+      position: relative;
       background: rgba(255, 255, 255, 0.8);
       padding: 20px;
+      padding-bottom: 60px;
       border-radius: 8px;
       width: 90%;
       max-width: 1000px;
@@ -579,12 +583,11 @@
       }
 
       .modal-content {
+        position: relative;
         background: rgba(50, 50, 50, 0.9);
+        padding-bottom: 60px;
       }
 
-      #readerBar {
-        background: rgba(0, 0, 0, 0.4);
-      }
     }
 
     body[data-theme='light'] {
@@ -615,7 +618,9 @@
     }
 
     body[data-theme='light'] .modal-content {
+      position: relative;
       background: rgba(255, 255, 255, 0.8);
+      padding-bottom: 60px;
     }
 
     body[data-theme='dark'] {
@@ -654,7 +659,9 @@
     }
 
     body[data-theme='dark'] #readerBar {
-      background: rgba(0, 0, 0, 0.4);
+      background: rgba(255, 255, 255, 0.5);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.4);
     }
 
     body[data-theme='dark'] .msg.user {
@@ -782,8 +789,7 @@
   <div class="modal" id="modal">
     <div class="modal-content" id="modalContent"></div>
     <div id="readerBar">
-      <button id="toggleReader" class="btn">Reader Mode</button>
-      <button id="webMode" class="btn">Web Mode</button>
+      <button id="viewToggle" class="btn">Web View</button>
       <button id="summaryBtn" class="btn">Summary</button>
       <button id="unsubBtn" class="btn">Unsubscribe</button>
       <button id="backBtn" class="btn" style="display:none;">Back</button>
