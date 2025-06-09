@@ -1704,41 +1704,34 @@ opmlInput.onchange = async () => {
   opmlInput.value = '';
 };
 
-window.addEventListener('DOMContentLoaded', async () => {
-  initLazyObserver();
-  const data = await window.api.loadData();
-  state.feeds = normalizeFeeds(data.feeds || []);
-  state.articles = data.articles || {};
-  state.feedWeights = data.feedWeights || {};
-  state.favorites = data.favorites || [];
-  state.favoriteFeeds = data.favoriteFeeds || [];
-  state.prefs = data.prefs || {};
-  state.podcasts = data.podcasts || [];
-  state.episodes = data.episodes || {};
-  state.offline = data.offline || [];
-  state.read = data.read || {};
-  applyTheme();
-  applyLayout();
-  showPodcastMode(false);
-  showNewsMode(false);
-  renderFeeds();
-  renderPodcasts();
-  renderNewsLibrary();
-  const def = state.prefs.defaultFeed || '*';
-  if (def === '*') {
-    currentFeed = '*';
-    if (state.articles['*']) {
-      currentArticles = state.articles['*'];
+  window.addEventListener('DOMContentLoaded', async () => {
+    initLazyObserver();
+    const data = await window.api.loadData();
+    state.feeds = normalizeFeeds(data.feeds || []);
+    state.articles = data.articles || {};
+    state.feedWeights = data.feedWeights || {};
+    state.favorites = data.favorites || [];
+    state.favoriteFeeds = data.favoriteFeeds || [];
+    state.prefs = data.prefs || {};
+    state.podcasts = data.podcasts || [];
+    state.episodes = data.episodes || {};
+    state.offline = data.offline || [];
+    state.read = data.read || {};
+    applyTheme();
+    applyLayout();
+    showPodcastMode(false);
+    showNewsMode(false);
+    renderFeeds();
+    renderPodcasts();
+    renderNewsLibrary();
+    const def = state.prefs.defaultFeed || '*';
+    currentFeed = def;
+    if (state.articles[def]) {
+      currentArticles = state.articles[def];
       updateArticleDisplay();
-    } else if (state.feeds.length) {
-      prefetchAll();
     }
-    setActiveFeedButton('*');
-  } else {
-    loadArticles(def);
-    if (state.feeds.length) prefetchAll(false);
-  }
-});
+    setActiveFeedButton(def);
+  });
 
 allFeedsBtn.onclick = () => {
   if (state.articles['*']) {
