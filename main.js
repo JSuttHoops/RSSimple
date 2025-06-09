@@ -19,6 +19,7 @@ const DATA_FILE = path.join(USER_DIR, 'data.json');
 const FEED_DIR = path.join(USER_DIR, 'feeds');
 const OPML_FILE = path.join(FEED_DIR, 'feeds.opml');
 const OFFLINE_DIR = path.join(USER_DIR, 'offline');
+const OLLAMA_URL = 'http://localhost:11434';
 
 function ensureFeedDir() {
   if (!fs.existsSync(FEED_DIR)) {
@@ -146,6 +147,7 @@ ipcMain.handle('fetch-feed', async (_e, url) => {
       content: i['content:encoded'] || i.content || '',
       isoDate: i.isoDate,
       pubDate: i.pubDate,
+      categories: i.categories || [],
       feedTitle: feed.title
     }));
     const image = feed.image?.url || '';
@@ -251,6 +253,30 @@ ipcMain.handle('reader-parse', async (_e, url) => {
 
 ipcMain.handle('open-link', (_e, url) => {
   shell.openExternal(url);
+});
+
+ipcMain.handle('list-ollama-models', async () => {
+  try {
+    const res = await fetch(`${OLLAMA_URL}/api/tags`);
+    const json = await res.json();
+    return json.models.map(m => m.name);
+  } catch {
+    return [];
+  }
+});
+
+ipcMain.handle('ollama-query', async (_e, { model, prompt }) => {
+  try {
+    const res = await fetch(`${OLLAMA_URL}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, prompt, stream: false })
+    });
+    const json = await res.json();
+    return json.response;
+  } catch (e) {
+    return 'Error: ' + e.message;
+  }
 });
 
 ipcMain.handle('fetch-bluesky', async (_e, handle) => {
