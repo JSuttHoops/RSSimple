@@ -21,5 +21,6 @@ contextBridge.exposeInMainWorld('api', {
   openMainLog: () => ipcRenderer.invoke('open-main-log'),
   listFonts: () => ipcRenderer.invoke('list-fonts'),
   addFont: (file) => ipcRenderer.invoke('add-font', file),
-  fontPath: (name) => ipcRenderer.invoke('font-path', name)
+  fontPath: (name) => ipcRenderer.invoke('font-path', name),
+  removeFont: (name) => ipcRenderer.invoke('remove-font', name)
 });
