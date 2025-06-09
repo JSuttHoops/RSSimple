@@ -837,11 +837,14 @@ async function showArticle(a) {
   if (!raw && !parsed) {
     raw = `<p><a href="${a.link}" target="_blank">Open Link</a></p>`;
   }
-  const content = parsed || raw;
+  let content = parsed || raw;
+  let doc;
+  try {
+    doc = new DOMParser().parseFromString(content, 'text/html');
+  } catch {}
   if (!a.image) {
     try {
-      const doc = new DOMParser().parseFromString(content, 'text/html');
-      let imgEl = doc.querySelector('img');
+      let imgEl = doc && doc.querySelector('img');
       if (!imgEl) {
         const resImg = await fetch(a.link);
         const htmlImg = await resImg.text();
@@ -854,6 +857,17 @@ async function showArticle(a) {
   let hero = `<h1>${sanitize(a.title)}</h1>`;
   if (a.image) {
     hero = `<div class="hero"><img src="${a.image}" loading="lazy"/><h1>${sanitize(a.title)}</h1></div>`;
+    if (doc) {
+      const firstImg = doc.querySelector('img');
+      if (firstImg) {
+        const srcAttr = firstImg.getAttribute('src') || '';
+        const abs = srcAttr ? new URL(srcAttr, a.link).href : '';
+        if (firstImg.src === a.image || abs === a.image) {
+          firstImg.remove();
+          content = doc.body.innerHTML;
+        }
+      }
+    }
   }
   modalContent.innerHTML =
     hero +
@@ -1449,33 +1463,40 @@ async function prefetchAll(show = true) {
   const timeline = [];
   const perFeed = {};
   const seen = new Set();
-  const tasks = state.feeds.map(feed => {
-    const url = feed.url || feed;
-    const ctrl = new AbortController();
-    return fetchAny(url, ctrl)
-      .then(res => {
-        if (res.error) return;
-        if (res.feedTitle && !feed.title) feed.title = res.feedTitle;
-        perFeed[url] = res.items;
-        res.items.forEach(item => {
-          if (res.feedTitle) item.feedTitle = res.feedTitle;
-          const id = item.guid || item.link;
-          if (!seen.has(id)) {
-            seen.add(id);
-            timeline.push(item);
-          }
-        });
-        timeline.sort((a, b) => new Date(b.isoDate || b.pubDate || 0) - new Date(a.isoDate || a.pubDate || 0));
-        state.articles[url] = res.items;
-        state.articles['*'] = timeline;
-        if (show || currentFeed === '*') {
-          currentArticles = timeline;
-          updateArticleDisplay();
-        }
+  const feeds = state.feeds.slice();
+  const limit = 5;
+  while (feeds.length) {
+    const batch = feeds.splice(0, limit);
+    const results = await Promise.all(
+      batch.map(feed => {
+        const url = feed.url || feed;
+        const ctrl = new AbortController();
+        return fetchAny(url, ctrl)
+          .then(res => ({ feed, url, res }))
+          .catch(() => ({ feed, url, res: null }));
       })
-      .catch(() => {});
-  });
-  await Promise.allSettled(tasks);
+    );
+    results.forEach(({ feed, url, res }) => {
+      if (!res || res.error) return;
+      if (res.feedTitle && !feed.title) feed.title = res.feedTitle;
+      perFeed[url] = res.items;
+      res.items.forEach(item => {
+        if (res.feedTitle) item.feedTitle = res.feedTitle;
+        const id = item.guid || item.link;
+        if (!seen.has(id)) {
+          seen.add(id);
+          timeline.push(item);
+        }
+      });
+      state.articles[url] = res.items;
+    });
+  }
+  timeline.sort((a, b) => new Date(b.isoDate || b.pubDate || 0) - new Date(a.isoDate || a.pubDate || 0));
+  state.articles['*'] = timeline;
+  if (show || currentFeed === '*') {
+    currentArticles = timeline;
+    updateArticleDisplay();
+  }
   renderFeeds();
   scheduleSave();
 }
