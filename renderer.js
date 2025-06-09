@@ -851,12 +851,12 @@ async function showArticle(a) {
       if (imgEl) a.image = imgEl.src;
     } catch {}
   }
-  const imgPart = a.image
-    ? `<img src="${a.image}" loading="lazy" style="width:100%;max-height:400px;margin-bottom:8px;"/>`
-    : '';
+  let hero = `<h1>${sanitize(a.title)}</h1>`;
+  if (a.image) {
+    hero = `<div class="hero"><img src="${a.image}" loading="lazy"/><h1>${sanitize(a.title)}</h1></div>`;
+  }
   modalContent.innerHTML =
-    `<h2>${sanitize(a.title)}</h2>` +
-    imgPart +
+    hero +
     `<div class="reader" data-raw="" data-link="${a.link}"></div>` +
     `<div id="webContainer" style="display:none;width:100%;height:80vh;">
        <webview src="" style="width:100%;height:100%;border:0"></webview>
@@ -1197,6 +1197,7 @@ function applyReaderPrefs() {
   modalContent.style.fontSize = (state.prefs.textSize || 18) + 'px';
   const bg = state.prefs.bg || '#fff';
   modalContent.style.background = bg;
+  modalContent.style.setProperty('--reader-bg', bg);
   modalContent.style.color = textColorFor(bg);
   fontSelect.value = state.prefs.font || 'sans-serif';
   bgColor.value = bg;
@@ -1354,6 +1355,7 @@ function showAudioPlayer(ep) {
   audioPlayer = audio;
 }
 const ogCache = {};
+const imgCache = {};
 
 function parseXML(text) {
   const doc = new DOMParser().parseFromString(text, 'text/xml');
@@ -1388,7 +1390,23 @@ async function fetchOgImage(url) {
       ];
       for (const sel of selectors) {
         const el = doc.querySelector(sel);
-        if (el && el.getAttribute('content')) return el.getAttribute('content');
+        if (el && el.getAttribute('content')) {
+          const src = el.getAttribute('content');
+          if (!imgCache[src]) {
+            try {
+              const imgRes = await fetch(src);
+              const blob = await imgRes.blob();
+              imgCache[src] = await new Promise(r => {
+                const fr = new FileReader();
+                fr.onloadend = () => r(fr.result);
+                fr.readAsDataURL(blob);
+              });
+            } catch {
+              imgCache[src] = null;
+            }
+          }
+          return imgCache[src];
+        }
       }
       return null;
     } catch {

@@ -6,6 +6,7 @@
   <style>
     :root {
       --fg-dim: #555;
+      --reader-bg: #ffffff;
     }
     ::-webkit-scrollbar {
       width: 0;
@@ -261,7 +262,7 @@
       max-height: 400px;
       height: auto;
       border-radius: 8px;
-      object-fit: cover;
+      object-fit: contain;
     }
 
     .article-buttons {
@@ -435,10 +436,47 @@
     }
 
     .reader img {
-      width: 100%;
+      max-width: 100%;
+      width: auto;
       height: auto;
       margin-bottom: 12px;
       border-radius: 8px;
+      object-fit: contain;
+    }
+
+    .hero {
+      position: relative;
+      width: 100%;
+      background: var(--reader-bg);
+      overflow: hidden;
+    }
+
+    .hero img {
+      width: 100%;
+      height: auto;
+      display: block;
+      object-fit: contain;
+    }
+
+    .hero::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      top: 0;
+      pointer-events: none;
+      background: linear-gradient(to top, var(--reader-bg), rgba(255,255,255,0));
+    }
+
+    .hero h1 {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      margin: 0;
+      text-align: center;
+      width: 90%;
     }
 
     .reader blockquote {
