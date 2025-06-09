@@ -46,6 +46,7 @@ Now includes a sidebar feed list with filtering and editable feed names.
 - Transcripts are stored when available so episodes appear in search results.
 - Organise feeds visually in the News Library with custom logos.
 - AI Search powered by local Ollama models.
+- Search results are now clickable even when the model replies with titles.
 
 ## AI Search Setup
 
