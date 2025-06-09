@@ -863,7 +863,14 @@ async function showAiSearch() {
         `You are a search assistant. Ignore any earlier questions and focus solely on the query below. Choose the articles whose TITLES best match the question. Metadata is only for reference. Reply ONLY with a comma-separated list of the numbers that best answer the question or "none".\nArticles:\n${docs}\nQuestion: ${query}\nAnswer:`;
       const resultEl = document.getElementById('aiResult');
       resultEl.textContent = 'Thinking...';
-      const out = await window.api.ollamaQuery({ model, prompt });
+      let out;
+      try {
+        out = await window.api.ollamaQuery({ model, prompt });
+      } catch (e) {
+        console.error(e);
+        resultEl.textContent = 'Unable to connect to AI service.';
+        return;
+      }
       if (/^Error:/i.test(out.trim())) {
         resultEl.textContent = out.trim();
         window.api.logAiSearch({ query, results: out.trim() });
@@ -939,7 +946,14 @@ async function showSummary() {
       addMsg('Summarizing...', 'ai');
       const model = sel.value;
       const prompt = `Summarize the article below in bullet points.\n${text}`;
-      const out = await window.api.ollamaQuery({ model, prompt });
+      let out;
+      try {
+        out = await window.api.ollamaQuery({ model, prompt });
+      } catch (e) {
+        console.error(e);
+        chat.lastChild.textContent = 'Unable to connect to AI service.';
+        return;
+      }
       chat.lastChild.innerHTML = parseMarkdown(out.trim());
     };
     document.getElementById('sumAsk').onclick = async () => {
@@ -950,7 +964,14 @@ async function showSummary() {
       addMsg('Thinking...', 'ai');
       const model = sel.value;
       const prompt = `Answer the question using only the article below.\nArticle:\n${text}\nQuestion: ${q}`;
-      const out = await window.api.ollamaQuery({ model, prompt });
+      let out;
+      try {
+        out = await window.api.ollamaQuery({ model, prompt });
+      } catch (e) {
+        console.error(e);
+        chat.lastChild.textContent = 'Unable to connect to AI service.';
+        return;
+      }
       chat.lastChild.innerHTML = parseMarkdown(out.trim());
     };
     qInput.onkeypress = (e) => {
