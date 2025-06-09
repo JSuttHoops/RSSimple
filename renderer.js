@@ -831,13 +831,10 @@ async function showAiSearch() {
       const model = sel.value;
       const all = Object.values(state.articles).flat();
       const docs = all.slice(0, 200).map((a, i) => {
-        const text = (a.summary || a.content || '').replace(/\s+/g, ' ');
-        const snip = text.split('. ').slice(0, 2).join('. ');
         const date = (a.isoDate || a.pubDate || '').slice(0, 10);
         const cats = (a.categories || []).join(', ');
-        const meta = `${a.feedTitle || ''}${date ? ' ' + date : ''}` +
-          (cats ? ` [${cats}]` : '');
-        return `${i + 1}. "${a.title}" (${meta}) - ${snip}`;
+        const meta = [a.feedTitle, date, cats && `[${cats}]`].filter(Boolean).join(' ');
+        return `${i + 1}. "${a.title}"${meta ? ` (${meta})` : ''}`;
       }).join('\n');
       const prompt =
         `You are a search assistant. Below is a numbered list of articles. Reply with a comma-separated list of the numbers that best answer the question or "none".\nArticles:\n${docs}\nQuestion: ${query}`;

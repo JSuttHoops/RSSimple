@@ -60,4 +60,4 @@ Now includes a sidebar feed list with filtering and editable feed names.
 4. Click the **AI Search** button next to the regular search box.
 5. Pick a model from the dropdown, type your question and hit **Search**.
 
-The app sends each article's headline, a short snippet, any categories, the feed name and the publication date to your selected model. The model replies with the numbers of the most relevant articles so you can open them in reader or normal view.
+The app sends each article's headline and publication date along with its feed name and any categories to your selected model. The model replies with the numbers of the most relevant articles so you can open them in reader or normal view.
