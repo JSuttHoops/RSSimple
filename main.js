@@ -20,6 +20,7 @@ const DATA_FILE = path.join(USER_DIR, 'data.json');
 const FEED_DIR = path.join(USER_DIR, 'feeds');
 const OPML_FILE = path.join(FEED_DIR, 'feeds.opml');
 const OFFLINE_DIR = path.join(USER_DIR, 'offline');
+const FONT_DIR = path.join(USER_DIR, 'fonts');
 const LOG_FILE = path.join(USER_DIR, 'ai-search.log');
 const MAIN_LOG = path.join(USER_DIR, 'main.log');
 const OLLAMA_URL = 'http://localhost:11434';
@@ -34,6 +35,12 @@ function ensureFeedDir() {
 function ensureOfflineDir() {
   if (!fs.existsSync(OFFLINE_DIR)) {
     fs.mkdirSync(OFFLINE_DIR, { recursive: true });
+  }
+}
+
+function ensureFontDir() {
+  if (!fs.existsSync(FONT_DIR)) {
+    fs.mkdirSync(FONT_DIR, { recursive: true });
   }
 }
 
@@ -81,6 +88,8 @@ function loadData() {
     if (!data.episodes) data.episodes = {};
     if (!data.offline) data.offline = [];
     if (!data.read) data.read = {};
+    if (!data.prefs) data.prefs = { fonts: [] };
+    if (!data.prefs.fonts) data.prefs.fonts = [];
     data.feeds = data.feeds.map(f => {
       if (typeof f === 'string') return { url: f, title: '', tags: [] };
       if (!f.tags) f.tags = [];
@@ -94,7 +103,7 @@ function loadData() {
     }
     return data;
   } catch (e) {
-    const empty = { feeds: [], articles: {}, feedWeights: {}, favorites: [], favoriteFeeds: [], prefs: {}, podcasts: [], episodes: {}, offline: [], read: {} };
+    const empty = { feeds: [], articles: {}, feedWeights: {}, favorites: [], favoriteFeeds: [], prefs: { fonts: [] }, podcasts: [], episodes: {}, offline: [], read: {} };
     if (fs.existsSync(OPML_FILE)) {
       const parsed = parseOPML(OPML_FILE);
       const map = new Map(parsed.map(f => [f.url, f]));
@@ -129,6 +138,7 @@ function createWindow() {
 app.whenReady().then(() => {
   ensureFeedDir();
   ensureOfflineDir();
+  ensureFontDir();
   createWindow();
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -359,4 +369,22 @@ ipcMain.handle('log-main', (_e, info) => {
 
 ipcMain.handle('open-main-log', () => {
   shell.openPath(MAIN_LOG);
+});
+
+ipcMain.handle('list-fonts', () => {
+  ensureFontDir();
+  return fs.readdirSync(FONT_DIR).filter(f => /\.(ttf|otf|woff2?|woff)$/i.test(f));
+});
+
+ipcMain.handle('add-font', (_e, filePath) => {
+  ensureFontDir();
+  const ext = path.extname(filePath);
+  const name = sanitize(path.basename(filePath, ext)) + ext;
+  fs.copyFileSync(filePath, path.join(FONT_DIR, name));
+  return name;
+});
+
+ipcMain.handle('font-path', (_e, name) => {
+  ensureFontDir();
+  return path.join(FONT_DIR, name);
 });

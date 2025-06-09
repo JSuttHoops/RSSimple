@@ -349,10 +349,11 @@
     }
 
     #readerBar {
-      position: absolute;
+      position: fixed;
       bottom: 10px;
       left: 50%;
       transform: translateX(-50%);
+      z-index: 10;
       display: flex;
       gap: 8px;
       background: rgba(255, 255, 255, 0.5);
@@ -797,6 +798,8 @@
         <option value="sans-serif">Sans</option>
         <option value="serif">Serif</option>
       </select>
+      <button id="uploadFontBtn" class="btn">Upload Font</button>
+      <input type="file" id="fontFile" accept=".ttf,.otf,.woff,.woff2" style="display:none" />
       <input type="color" id="bgColor" value="#ffffff" />
     </div>
   </div>
