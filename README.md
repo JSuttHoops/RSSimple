@@ -31,7 +31,7 @@ Now includes a sidebar feed list with filtering and editable feed names.
 - Dark mode that follows system preference.
 - Weighted feed sorting based on how often you open a feed.
 - "All Recent" tab aggregates articles from the past week.
-- On startup, feeds are prefetched concurrently and "All Recent" loads by default.
+- Feeds only load when selected or refreshed, so the app doesn't fetch on startup.
 - Reader mode with adjustable font and background color.
 - Summarize articles with your chosen Ollama model.
 - Improved reader formatting and responsive layout.
