@@ -9,6 +9,7 @@ const favoritesBtn = document.getElementById('favoritesBtn');
 const offlineBtn = document.getElementById("offlineBtn");
 const favFeedsBtn = document.getElementById('favFeedsBtn');
 const searchInput = document.getElementById('searchInput');
+const searchBtn = document.getElementById('searchBtn');
 const rangeSelect = document.getElementById('rangeSelect');
 const sinceDate = document.getElementById('sinceDate');
 const modal = document.getElementById('modal');
@@ -1357,17 +1358,27 @@ filterInput.oninput = () => {
 };
 
 let searchTimer = null;
-searchInput.onkeyup = () => {
+searchInput.onkeyup = (e) => {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => {
-    const val = searchInput.value.trim();
-    if (aiToggle.checked) {
-      if (val) performAiSearch(val);
-    } else {
+  const val = searchInput.value.trim();
+  if (aiToggle.checked) {
+    if (e.key === 'Enter' && val) performAiSearch(val);
+  } else {
+    searchTimer = setTimeout(() => {
       searchText = val.toLowerCase();
       updateArticleDisplay();
-    }
-  }, 150);
+    }, 150);
+  }
+};
+
+searchBtn.onclick = () => {
+  const val = searchInput.value.trim();
+  if (aiToggle.checked) {
+    if (val) performAiSearch(val);
+  } else {
+    searchText = val.toLowerCase();
+    updateArticleDisplay();
+  }
 };
 
 rangeSelect.onchange = () => {
