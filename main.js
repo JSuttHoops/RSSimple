@@ -274,6 +274,8 @@ ipcMain.handle('list-ollama-models', async () => {
 });
 
 ipcMain.handle('ollama-query', async (_e, { model, prompt }) => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), 30000);
   try {
     const res = await fetch(`${OLLAMA_URL}/api/generate`, {
       method: 'POST',
@@ -283,12 +285,15 @@ ipcMain.handle('ollama-query', async (_e, { model, prompt }) => {
         prompt,
         stream: false,
         options: { num_ctx: OLLAMA_CTX }
-      })
+      }),
+      signal: controller.signal
     });
     const json = await res.json();
     return json.response;
   } catch (e) {
     return 'Error: ' + e.message;
+  } finally {
+    clearTimeout(id);
   }
 });
 
