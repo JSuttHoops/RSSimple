@@ -18,6 +18,7 @@ const readerBar = document.getElementById('readerBar');
 const toggleReader = document.getElementById('toggleReader');
 const webModeBtn = document.getElementById('webMode');
 const summaryBtn = document.getElementById('summaryBtn');
+const unsubBtn = document.getElementById('unsubBtn');
 const backBtn = document.getElementById('backBtn');
 const dailySummaryBtn = document.getElementById('dailySummaryBtn');
 const fontSelect = document.getElementById('fontSelect');
@@ -608,7 +609,7 @@ function renderArticles(articles) {
     div.appendChild(title);
     const meta = document.createElement('div');
     meta.className = 'meta';
-    const date = (a.isoDate || a.pubDate || '').slice(0, 10);
+    const date = formatDate(a.isoDate || a.pubDate || '');
     let info = '';
     if (a.feedTitle) info += a.feedTitle;
     if (date) info += (info ? ' ' : '') + date;
@@ -703,7 +704,7 @@ function renderAiArticles(el, list) {
     div.appendChild(title);
     const meta = document.createElement('div');
     meta.className = 'meta';
-    const date = (a.isoDate || a.pubDate || '').slice(0, 10);
+    const date = formatDate(a.isoDate || a.pubDate || '');
     let info = '';
     if (a.feedTitle) info += a.feedTitle;
     if (date) info += (info ? ' ' : '') + date;
@@ -854,6 +855,7 @@ async function showArticle(a) {
       if (imgEl) a.image = imgEl.src;
     } catch {}
   }
+  const dateStr = formatDate(a.isoDate || a.pubDate || '', true);
   let hero = `<h1>${sanitize(a.title)}</h1>`;
   if (a.image) {
     hero = `<div class="hero"><img src="${a.image}" loading="lazy"/><h1>${sanitize(a.title)}</h1></div>`;
@@ -868,6 +870,9 @@ async function showArticle(a) {
         }
       }
     }
+  }
+  if (dateStr) {
+    hero += `<div class="pubdate">${dateStr}</div>`;
   }
   modalContent.innerHTML =
     `<div class="reader" data-raw="" data-hero="" data-link="${a.link}"></div>` +
@@ -958,6 +963,18 @@ function sanitize(text) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function formatDate(str, withTime = false) {
+  if (!str) return '';
+  const d = new Date(str);
+  if (Number.isNaN(d.getTime())) return '';
+  const opts = { year: 'numeric', month: 'short', day: 'numeric' };
+  let out = d.toLocaleDateString(undefined, opts);
+  if (withTime) {
+    out += ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  return out;
 }
 
 function parseMarkdown(text) {
@@ -1251,6 +1268,27 @@ summaryBtn.onclick = () => {
   showSummary();
 };
 
+unsubBtn.onclick = () => {
+  if (!currentArticle) return;
+  const url = currentArticle.feedUrl;
+  if (!url) return;
+  if (confirm('Unsubscribe from this feed?')) {
+    state.feeds = state.feeds.filter(f => (f.url || f) !== url);
+    delete state.articles[url];
+    renderFeeds();
+    renderNewsLibrary();
+    scheduleSave();
+    if (currentFeed === url) {
+      currentFeed = '*';
+      currentArticles = state.articles['*'] || [];
+      updateArticleDisplay();
+      setActiveFeedButton('*');
+    }
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+};
+
 dailySummaryBtn.onclick = () => {
   showDailySummary();
 };
@@ -1454,7 +1492,12 @@ function fetchAny(url, controller) {
       if (!res.ok) throw new Error(res.statusText);
       return res.text();
     })
-    .then(parseXML);
+    .then(text => {
+      const data = parseXML(text);
+      data.items.forEach(it => { it.feedUrl = url; });
+      data.feedUrl = url;
+      return data;
+    });
 }
 
 async function prefetchAll(show = true) {
@@ -1515,6 +1558,7 @@ async function loadArticles(url) {
       const result = await fetchAny(url);
       if (result.error) throw new Error(result.error);
       items = result.items.slice(0, 50);
+      items.forEach(it => { it.feedUrl = url; });
       if (result.feedTitle) {
         items.forEach(it => { it.feedTitle = result.feedTitle; });
       }
@@ -1726,7 +1770,9 @@ opmlInput.onchange = async () => {
     renderNewsLibrary();
     const def = state.prefs.defaultFeed || '*';
     currentFeed = def;
-    if (state.articles[def]) {
+    if (def === '*') {
+      await prefetchAll(false);
+    } else if (state.articles[def]) {
       currentArticles = state.articles[def];
       updateArticleDisplay();
     }
@@ -1734,13 +1780,13 @@ opmlInput.onchange = async () => {
   });
 
 allFeedsBtn.onclick = () => {
-  if (state.articles['*']) {
+  if (currentFeed !== '*' || !state.articles['*']) {
+    prefetchAll();
+  } else {
     currentFeed = '*';
     currentArticles = state.articles['*'];
     updateArticleDisplay();
     setActiveFeedButton('*');
-  } else {
-    prefetchAll();
   }
 };
 
