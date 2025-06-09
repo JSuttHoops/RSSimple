@@ -22,5 +22,6 @@ contextBridge.exposeInMainWorld('api', {
   listFonts: () => ipcRenderer.invoke('list-fonts'),
   addFont: (file) => ipcRenderer.invoke('add-font', file),
   fontPath: (name) => ipcRenderer.invoke('font-path', name),
-  removeFont: (name) => ipcRenderer.invoke('remove-font', name)
+  removeFont: (name) => ipcRenderer.invoke('remove-font', name),
+  searxSearch: (opts) => ipcRenderer.invoke('searx-search', opts)
 });

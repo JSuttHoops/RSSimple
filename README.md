@@ -45,23 +45,21 @@ Now includes a sidebar feed list with filtering and editable feed names.
 - Episode lists show cover art with Play and Download options.
 - Transcripts are stored when available so episodes appear in search results.
 - Organise feeds visually in the News Library with custom logos.
-- AI Search powered by local Ollama models.
-- Search results are now clickable even when the model replies with titles.
+- "Ask Simpli" dialog with optional web search via SearxNG and Ollama models.
+- SearxNG instance can be changed in the Settings panel.
 
-## AI Search Setup
+## Ask Simpli
 
 1. Install [Ollama](https://ollama.ai) and make sure it is running:
    ```bash
    ollama serve
    ```
 2. Pull a model with good context length. Lightweight options like `phi3` or `llama3` work well:
- ```bash
-  ollama pull phi3
-  ```
+   ```bash
+   ollama pull phi3
+   ```
 3. Run RSSimple with `npm start`.
-   RSSimple requests an 8k token context window for each search so recent articles
-   fit in one prompt. Models with smaller limits will use their maximum context.
-4. Toggle the **AI** switch next to the search box.
-5. Pick a model from the dropdown and type your question in the search field.
+4. Click **Ask Simpli** to open the dialog. Choose your model and type a question.
+5. Enable **Web search** to include SearxNG results using the instance set in Settings.
 
-The app sends each article's headline and publication date along with its feed name and any categories to your selected model. The model replies with the numbers of the most relevant articles so you can open them in reader or normal view.
+Ask Simpli fetches today's article list and (when enabled) a short set of web results. The Ollama model replies conversationally, explaining the steps it took and citing which websites were used from SearxNG.

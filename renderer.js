@@ -19,7 +19,7 @@ const viewToggle = document.getElementById('viewToggle');
 const summaryBtn = document.getElementById('summaryBtn');
 const unsubBtn = document.getElementById('unsubBtn');
 const backBtn = document.getElementById('backBtn');
-const dailySummaryBtn = document.getElementById('dailySummaryBtn');
+const askBtn = document.getElementById('askBtn');
 const fontSelect = document.getElementById('fontSelect');
 const bgColor = document.getElementById('bgColor');
 const uploadFontBtn = document.getElementById('uploadFontBtn');
@@ -43,19 +43,8 @@ const audioContent = document.getElementById('audioContent');
 const exploreBtn = document.getElementById('exploreBtn');
 const rssControls = document.getElementById('rssControls');
 const podcastControls = document.getElementById('podcastControls');
-const aiToggle = document.getElementById('aiToggle');
-const modelSelect = document.getElementById('modelSelect');
 const aiModal = document.getElementById('aiModal');
 const aiContent = document.getElementById('aiContent');
-let modelsLoaded = false;
-aiToggle.onchange = async () => {
-  modelSelect.style.display = aiToggle.checked ? 'inline' : 'none';
-  if (aiToggle.checked && !modelsLoaded) {
-    const models = await window.api.listOllamaModels();
-    modelSelect.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
-    modelsLoaded = true;
-  }
-};
 allFeedsBtn.dataset.feed = '*';
 favoritesBtn.dataset.feed = 'favorites';
 favFeedsBtn.dataset.feed = 'favfeeds';
@@ -191,7 +180,7 @@ function normalizeFeeds(feeds) {
   });
 }
 
-async function showDailySummary() {
+async function showAskSimpli() {
   const today = new Date().toISOString().slice(0, 10);
   let list = Object.values(state.articles).flat();
   list = list.filter(a => (a.isoDate || a.pubDate || '').startsWith(today));
@@ -206,9 +195,10 @@ async function showDailySummary() {
   return new Promise(async (res) => {
     aiContent.innerHTML = `<div>` +
       `<div style="margin-bottom:8px;">Model: <select id="sumModel"></select></div>` +
+      `<div style="margin-bottom:8px;display:flex;align-items:center;gap:4px;">Web search <label class="switch"><input type="checkbox" id="webToggle"/><span class="slider"></span></label></div>` +
       `<div id="sumChat" class="chat"></div>` +
       `<div style="display:flex;gap:6px;margin-bottom:8px;">` +
-      `<input id="sumQuery" style="flex:1;" placeholder="Ask about these articles"/>` +
+      `<input id="sumQuery" style="flex:1;" placeholder="Ask Simpli"/>` +
       `<button id="sumAsk">Send</button>` +
       `<button id="sumDo">Summarize</button>` +
       `<button id="sumClose">Close</button>` +
@@ -228,6 +218,7 @@ async function showDailySummary() {
     });
     const chat = document.getElementById('sumChat');
     const qInput = document.getElementById('sumQuery');
+    const webToggle = document.getElementById('webToggle');
     const addMsg = (html, who) => {
       const div = document.createElement('div');
       div.className = `msg ${who}`;
@@ -266,10 +257,20 @@ async function showDailySummary() {
       addMsg(sanitize(q), 'user');
       history.push({ who: 'user', text: q });
       qInput.value = '';
-      addMsg('Thinking...', 'ai');
       const model = sel.value;
-      const hist = history.map(h => `${h.who === 'user' ? 'User' : 'Assistant'}: ${h.text}`).join('\n');
-      let prompt = `Answer the question using only the articles below.\nArticles:\n${text}`;
+      let web = '';
+      if (webToggle.checked) {
+        addMsg('Searching the web...', 'ai');
+        web = await window.api.searxSearch({ query: q, instance: state.prefs.searx });
+        chat.lastChild.innerHTML = parseMarkdown(web || 'No results');
+      }
+      addMsg('Thinking...', 'ai');
+      const hist = history
+        .map(h => `${h.who === 'user' ? 'User' : 'Assistant'}: ${h.text}`)
+        .join('\n');
+      let prompt =
+        `You are Simpli, a helpful assistant. Use the articles and any web results to answer concisely. Mention which websites you referenced from the web results and stop after replying.\nArticles:\n${text}`;
+      if (web) prompt += `\nWeb results:\n${web}`;
       if (hist) prompt += `\n${hist}`;
       prompt += `\nUser: ${q}`;
       let out;
@@ -760,60 +761,6 @@ function matchByTitle(text, list) {
   return results;
 }
 
-async function performAiSearch(query) {
-  const model = modelSelect.value;
-  let all = state.articles['*'] || Object.values(state.articles).flat();
-  all.sort((a, b) => {
-    const ad = new Date(a.isoDate || a.pubDate || 0).getTime();
-    const bd = new Date(b.isoDate || b.pubDate || 0).getTime();
-    return bd - ad;
-  });
-  const selected = [];
-  const lines = [];
-  const maxChars = 32000;
-  let len = 0;
-  for (const a of all) {
-    const feed = a.feedTitle ? ` (${a.feedTitle})` : '';
-    const line = `${selected.length + 1}. "${a.title}"${feed}`;
-    if (len + line.length + 1 > maxChars) break;
-    lines.push(line);
-    selected.push(a);
-    len += line.length + 1;
-  }
-  const docs = lines.join('\n');
-  const prompt =
-    `You are a search assistant. Ignore any earlier questions and focus solely on the query below. Choose the articles whose TITLES best match the question. Metadata is only for reference. Reply ONLY with a comma-separated list of the numbers that best answer the question or "none".\nArticles:\n${docs}\nQuestion: ${query}\nAnswer:`;
-  articlesDiv.innerHTML = 'Thinking...';
-  let out;
-  try {
-    out = await window.api.ollamaQuery({ model, prompt });
-  } catch (e) {
-    console.error(e);
-    articlesDiv.textContent = 'Unable to connect to AI service.';
-    return;
-  }
-  if (/^Error:/i.test(out.trim())) {
-    articlesDiv.textContent = out.trim();
-    window.api.logAiSearch({ query, results: out.trim() });
-    return;
-  }
-  const firstLine = out.trim().split(/\n/)[0];
-  const nums =
-    /none/i.test(firstLine)
-      ? []
-      : (firstLine.match(/\b\d+\b/g) || []).map(n => parseInt(n, 10) - 1);
-  let results = nums.map(i => selected[i]).filter(Boolean);
-  if (!results.length) {
-    results = matchByTitle(out, selected);
-  }
-  if (results.length) {
-    renderAiArticles(articlesDiv, results);
-  } else {
-    articlesDiv.innerHTML = parseMarkdown(out.trim());
-  }
-  const titles = results.length ? results.map(r => r.title).join('; ') : out.trim();
-  window.api.logAiSearch({ query, results: titles });
-}
 
 async function showArticle(a) {
   window.api.logMain({ type: 'showArticle', title: a.title });
@@ -1361,8 +1308,8 @@ unsubBtn.onclick = () => {
   }
 };
 
-dailySummaryBtn.onclick = () => {
-  showDailySummary();
+askBtn.onclick = () => {
+  showAskSimpli();
 };
 
 backBtn.onclick = () => {
@@ -1770,28 +1717,21 @@ filterInput.oninput = () => {
 };
 
 let searchTimer = null;
-searchInput.onkeyup = (e) => {
+
+searchInput.onkeyup = () => {
   clearTimeout(searchTimer);
   const val = searchInput.value.trim();
-  if (aiToggle.checked) {
-    if (e.key === 'Enter' && val) performAiSearch(val);
-  } else {
-    searchTimer = setTimeout(() => {
-      searchText = val.toLowerCase();
-      updateArticleDisplay();
-    }, 150);
-  }
+  searchTimer = setTimeout(() => {
+    searchText = val.toLowerCase();
+    updateArticleDisplay();
+  }, 150);
 };
 
 searchBtn.onclick = () => {
   const val = searchInput.value.trim();
   window.api.logMain({ type: 'search', query: val });
-  if (aiToggle.checked) {
-    if (val) performAiSearch(val);
-  } else {
-    searchText = val.toLowerCase();
-    updateArticleDisplay();
-  }
+  searchText = val.toLowerCase();
+  updateArticleDisplay();
 };
 
 rangeSelect.onchange = () => {
@@ -1946,6 +1886,7 @@ settingsBtn.onclick = async () => {
     <div>Default Feed: <select id="defaultFeed"><option value="*">All Recent</option>${state.feeds.map(f => `<option value="${f.url}">${f.title || f.url}</option>`).join('')}</select></div>
     <div>Layout: <select id="layoutSel"><option value="sidebar">Sidebar</option><option value="bottom">Bottom Bar</option><option value="gallery">Gallery</option></select></div>
     <div>Text Size: <input type="number" id="textSize" min="12" max="30" value="${state.prefs.textSize || 18}"/></div>
+    <div>SearxNG: <input type="text" id="searxInput" value="${state.prefs.searx || 'https://search.inetol.net'}"/></div>
     <button id="viewMainLogs">View Main Log</button>
     <button id="viewLogs">View AI Log</button>
     <button id="closeSettings">Close</button>`;
@@ -1956,6 +1897,7 @@ settingsBtn.onclick = async () => {
   document.getElementById('defaultFeed').value = state.prefs.defaultFeed || '*';
   document.getElementById('layoutSel').value = state.prefs.layout || 'sidebar';
   document.getElementById('textSize').value = state.prefs.textSize || 18;
+  document.getElementById('searxInput').value = state.prefs.searx || 'https://search.inetol.net';
   document.getElementById('viewMainLogs').onclick = () => {
     window.api.openMainLog();
   };
@@ -1992,6 +1934,7 @@ settingsBtn.onclick = async () => {
     state.prefs.defaultFeed = document.getElementById('defaultFeed').value;
     state.prefs.layout = document.getElementById('layoutSel').value;
     state.prefs.textSize = parseInt(document.getElementById('textSize').value, 10) || 18;
+    state.prefs.searx = document.getElementById('searxInput').value.trim() || 'https://search.inetol.net';
     settingsModal.style.display = 'none';
     applyTheme();
     applyLayout();
