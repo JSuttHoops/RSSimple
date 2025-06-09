@@ -856,6 +856,8 @@ async function showAiSearch() {
       } else {
         resultEl.textContent = out.trim();
       }
+      const titles = results.length ? results.map(r => r.title).join('; ') : out.trim();
+      window.api.logAiSearch({ query, results: titles });
     };
     document.getElementById('aiQuery').focus();
   });
@@ -1467,6 +1469,7 @@ settingsBtn.onclick = () => {
     <div>Default Feed: <select id="defaultFeed"><option value="*">All Recent</option>${state.feeds.map(f => `<option value="${f.url}">${f.title || f.url}</option>`).join('')}</select></div>
     <div>Layout: <select id="layoutSel"><option value="sidebar">Sidebar</option><option value="bottom">Bottom Bar</option><option value="gallery">Gallery</option></select></div>
     <div>Text Size: <input type="number" id="textSize" min="12" max="30" value="${state.prefs.textSize || 18}"/></div>
+    <button id="viewLogs">View AI Log</button>
     <button id="closeSettings">Close</button>`;
   settingsModal.style.display = 'flex';
   document.getElementById('setFont').value = state.prefs.font || 'sans-serif';
@@ -1474,6 +1477,9 @@ settingsBtn.onclick = () => {
   document.getElementById('defaultFeed').value = state.prefs.defaultFeed || '*';
   document.getElementById('layoutSel').value = state.prefs.layout || 'sidebar';
   document.getElementById('textSize').value = state.prefs.textSize || 18;
+  document.getElementById('viewLogs').onclick = () => {
+    window.api.openAiLog();
+  };
   document.getElementById('closeSettings').onclick = () => {
     state.prefs.font = document.getElementById('setFont').value;
     state.prefs.bg = document.getElementById('setBg').value;

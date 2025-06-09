@@ -15,4 +15,6 @@ contextBridge.exposeInMainWorld('api', {
   fetchBluesky: (handle) => ipcRenderer.invoke('fetch-bluesky', handle),
   listOllamaModels: () => ipcRenderer.invoke('list-ollama-models'),
   ollamaQuery: (opts) => ipcRenderer.invoke('ollama-query', opts),
+  logAiSearch: (info) => ipcRenderer.invoke('log-ai-search', info),
+  openAiLog: () => ipcRenderer.invoke('open-ai-log'),
 });
