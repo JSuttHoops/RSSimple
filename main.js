@@ -143,21 +143,35 @@ ipcMain.handle('save-data', (_e, data) => saveData(data));
 
 ipcMain.handle('fetch-feed', async (_e, url) => {
   try {
-    const feed = await parser.parseURL(url);
-    const items = feed.items.map(i => ({
+  const feed = await parser.parseURL(url);
+  const items = [];
+  for (const i of feed.items) {
+    let image =
+      i.enclosure?.url ||
+      (i['media:content'] && i['media:content'].url) ||
+      (i['media:thumbnail'] && i['media:thumbnail'].url) ||
+      (i.content && (i.content.match(/<img[^>]+src=\"([^\"]+)\"/) || [])[1]);
+    if (!image) {
+      try {
+        const res = await fetch(i.link);
+        const html = await res.text();
+        const dom = new JSDOM(html, { url: i.link });
+        const imgEl = dom.window.document.querySelector('img');
+        if (imgEl) image = imgEl.src;
+      } catch {}
+    }
+    items.push({
       title: i.title,
       link: i.link,
-      image: i.enclosure?.url ||
-             (i['media:content'] && i['media:content'].url) ||
-             (i['media:thumbnail'] && i['media:thumbnail'].url) ||
-             (i.content && (i.content.match(/<img[^>]+src=\"([^\"]+)\"/) || [])[1]),
+      image,
       summary: i.contentSnippet || i.summary || '',
       content: i['content:encoded'] || i.content || '',
       isoDate: i.isoDate,
       pubDate: i.pubDate,
       categories: i.categories || [],
       feedTitle: feed.title
-    }));
+    });
+  }
     const image = feed.image?.url || '';
     return { feedTitle: feed.title, items, image };
   } catch (e) {
