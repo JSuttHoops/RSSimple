@@ -583,6 +583,28 @@ function renderAiArticles(el, list) {
   el.appendChild(frag);
 }
 
+function matchByTitle(text, list) {
+  const norm = (s) =>
+    s
+      .toLowerCase()
+      .replace(/[*_"'`]/g, '')
+      .replace(/\(.+?\)/g, '')
+      .replace(/[^a-z0-9]+/g, '');
+  const lines = text
+    .trim()
+    .split(/\n+/)
+    .map(l => l.replace(/^[-*\d.\s]+/, '').trim())
+    .filter(Boolean);
+  const results = [];
+  lines.forEach(line => {
+    const n = norm(line);
+    if (!n) return;
+    const m = list.find(a => norm(a.title).startsWith(n) || n.startsWith(norm(a.title)));
+    if (m && !results.includes(m)) results.push(m);
+  });
+  return results;
+}
+
 async function performAiSearch(query) {
   const model = modelSelect.value;
   let all = state.articles['*'] || Object.values(state.articles).flat();
@@ -625,7 +647,10 @@ async function performAiSearch(query) {
     /none/i.test(firstLine)
       ? []
       : (firstLine.match(/\b\d+\b/g) || []).map(n => parseInt(n, 10) - 1);
-  const results = nums.map(i => selected[i]).filter(Boolean);
+  let results = nums.map(i => selected[i]).filter(Boolean);
+  if (!results.length) {
+    results = matchByTitle(out, selected);
+  }
   if (results.length) {
     renderAiArticles(articlesDiv, results);
   } else {
