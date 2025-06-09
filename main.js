@@ -26,6 +26,7 @@ const LOG_FILE = path.join(USER_DIR, 'ai-search.log');
 const MAIN_LOG = path.join(USER_DIR, 'main.log');
 const OLLAMA_URL = 'http://localhost:11434';
 const OLLAMA_CTX = 8192; // tokens to allocate per request
+const DEFAULT_SEARX = 'https://search.inetol.net';
 
 function ensureFeedDir() {
   if (!fs.existsSync(FEED_DIR)) {
@@ -91,6 +92,7 @@ function loadData() {
     if (!data.read) data.read = {};
     if (!data.prefs) data.prefs = { fonts: [] };
     if (!data.prefs.fonts) data.prefs.fonts = [];
+    if (!data.prefs.searx) data.prefs.searx = DEFAULT_SEARX;
     data.feeds = data.feeds.map(f => {
       if (typeof f === 'string') return { url: f, title: '', tags: [] };
       if (!f.tags) f.tags = [];
@@ -104,7 +106,7 @@ function loadData() {
     }
     return data;
   } catch (e) {
-    const empty = { feeds: [], articles: {}, feedWeights: {}, favorites: [], favoriteFeeds: [], prefs: { fonts: [] }, podcasts: [], episodes: {}, offline: [], read: {} };
+    const empty = { feeds: [], articles: {}, feedWeights: {}, favorites: [], favoriteFeeds: [], prefs: { fonts: [], searx: DEFAULT_SEARX }, podcasts: [], episodes: {}, offline: [], read: {} };
     if (fs.existsSync(OPML_FILE)) {
       const parsed = parseOPML(OPML_FILE);
       const map = new Map(parsed.map(f => [f.url, f]));
@@ -319,6 +321,21 @@ ipcMain.handle('ollama-query', async (_e, { model, prompt }) => {
     return json.response;
   } catch (e) {
     return 'Error: ' + e.message;
+  } finally {
+    clearTimeout(id);
+  }
+});
+
+ipcMain.handle('searx-search', async (_e, { query, instance }) => {
+  const url = `${(instance || DEFAULT_SEARX).replace(/\/$/, '')}/search?q=${encodeURIComponent(query)}&format=json`;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': 'RSSimple' }, signal: controller.signal });
+    const json = await res.json();
+    return (json.results || []).slice(0, 5).map(r => `- ${r.title} (${r.url})`).join('\n');
+  } catch (e) {
+    return '';
   } finally {
     clearTimeout(id);
   }
