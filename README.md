@@ -60,7 +60,7 @@ Now includes a sidebar feed list with filtering and editable feed names.
 3. Run RSSimple with `npm start`.
    RSSimple requests an 8k token context window for each search so recent articles
    fit in one prompt. Models with smaller limits will use their maximum context.
-4. Click the **AI Search** button next to the regular search box.
-5. Pick a model from the dropdown, type your question and hit **Search**.
+4. Toggle the **AI** switch next to the search box.
+5. Pick a model from the dropdown and type your question in the search field.
 
 The app sends each article's headline and publication date along with its feed name and any categories to your selected model. The model replies with the numbers of the most relevant articles so you can open them in reader or normal view.
