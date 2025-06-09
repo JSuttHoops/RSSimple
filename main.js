@@ -19,6 +19,7 @@ const DATA_FILE = path.join(USER_DIR, 'data.json');
 const FEED_DIR = path.join(USER_DIR, 'feeds');
 const OPML_FILE = path.join(FEED_DIR, 'feeds.opml');
 const OFFLINE_DIR = path.join(USER_DIR, 'offline');
+const LOG_FILE = path.join(USER_DIR, 'ai-search.log');
 const OLLAMA_URL = 'http://localhost:11434';
 const OLLAMA_CTX = 8192; // tokens to allocate per request
 
@@ -319,4 +320,13 @@ ipcMain.handle('fetch-bluesky', async (_e, handle) => {
   } catch (e) {
     return { error: e.message, items: [] };
   }
+});
+
+ipcMain.handle('log-ai-search', (_e, { query, results }) => {
+  const line = `[${new Date().toISOString()}] ${query} -> ${results}\n`;
+  fs.appendFileSync(LOG_FILE, line);
+});
+
+ipcMain.handle('open-ai-log', () => {
+  shell.openPath(LOG_FILE);
 });
