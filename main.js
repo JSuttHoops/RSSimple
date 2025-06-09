@@ -21,6 +21,7 @@ const FEED_DIR = path.join(USER_DIR, 'feeds');
 const OPML_FILE = path.join(FEED_DIR, 'feeds.opml');
 const OFFLINE_DIR = path.join(USER_DIR, 'offline');
 const LOG_FILE = path.join(USER_DIR, 'ai-search.log');
+const MAIN_LOG = path.join(USER_DIR, 'main.log');
 const OLLAMA_URL = 'http://localhost:11434';
 const OLLAMA_CTX = 8192; // tokens to allocate per request
 
@@ -349,4 +350,13 @@ ipcMain.handle('log-ai-search', (_e, { query, results }) => {
 
 ipcMain.handle('open-ai-log', () => {
   shell.openPath(LOG_FILE);
+});
+
+ipcMain.handle('log-main', (_e, info) => {
+  const line = `[${new Date().toISOString()}] ${JSON.stringify(info)}\n`;
+  fs.appendFileSync(MAIN_LOG, line);
+});
+
+ipcMain.handle('open-main-log', () => {
+  shell.openPath(MAIN_LOG);
 });

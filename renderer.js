@@ -815,6 +815,7 @@ async function performAiSearch(query) {
 }
 
 async function showArticle(a) {
+  window.api.logMain({ type: 'showArticle', title: a.title });
   currentArticle = a;
   let raw = a.content;
   if (!raw) {
@@ -1303,6 +1304,7 @@ backBtn.onclick = () => {
 };
 
 async function downloadArticle(a) {
+  window.api.logMain({ type: 'downloadArticle', title: a.title });
   const file = await window.api.downloadArticle({ url: a.link, title: a.title });
   state.offline.push({
     title: a.title,
@@ -1315,6 +1317,7 @@ async function downloadArticle(a) {
 }
 
 async function downloadEpisode(ep) {
+  window.api.logMain({ type: 'downloadEpisode', title: ep.title });
   const file = await window.api.downloadEpisode({ url: ep.audio, title: ep.title });
   state.offline.push({
     title: ep.title,
@@ -1328,6 +1331,7 @@ async function downloadEpisode(ep) {
 
 let audioPlayer = null;
 function playEpisode(ep) {
+  window.api.logMain({ type: 'playEpisode', title: ep.title });
   if (audioPlayer) audioPlayer.pause();
   showAudioPlayer(ep);
 }
@@ -1508,7 +1512,6 @@ async function prefetchAll(show = true) {
     setActiveFeedButton('*');
   }
   const timeline = [];
-  const perFeed = {};
   const seen = new Set();
   const feeds = state.feeds.slice();
   const limit = 5;
@@ -1527,7 +1530,7 @@ async function prefetchAll(show = true) {
       if (!res || res.error) return;
       if (res.feedTitle && !feed.title) feed.title = res.feedTitle;
       const items = res.items.slice(0, 50);
-      perFeed[url] = items;
+      state.articles[url] = items;
       items.forEach(item => {
         if (res.feedTitle) item.feedTitle = res.feedTitle;
         const id = item.guid || item.link;
@@ -1536,20 +1539,20 @@ async function prefetchAll(show = true) {
           timeline.push(item);
         }
       });
-      state.articles[url] = items;
     });
-    timeline.sort((a, b) => new Date(b.isoDate || b.pubDate || 0) - new Date(a.isoDate || a.pubDate || 0));
-    state.articles['*'] = timeline;
-    if (show || currentFeed === '*') {
-      currentArticles = timeline;
-      updateArticleDisplay();
-    }
-    renderFeeds();
-    scheduleSave();
   }
+  timeline.sort((a, b) => new Date(b.isoDate || b.pubDate || 0) - new Date(a.isoDate || a.pubDate || 0));
+  state.articles['*'] = timeline;
+  if (currentFeed === '*') {
+    currentArticles = timeline;
+    updateArticleDisplay();
+  }
+  renderFeeds();
+  scheduleSave();
 }
 
 async function loadArticles(url) {
+  window.api.logMain({ type: 'loadArticles', url });
   renderSpinner(articlesDiv);
   state.feedWeights[url] = (state.feedWeights[url] || 0) + 1;
   let items = state.articles[url];
@@ -1699,6 +1702,7 @@ searchInput.onkeyup = (e) => {
 
 searchBtn.onclick = () => {
   const val = searchInput.value.trim();
+  window.api.logMain({ type: 'search', query: val });
   if (aiToggle.checked) {
     if (val) performAiSearch(val);
   } else {
@@ -1749,6 +1753,17 @@ opmlInput.onchange = async () => {
 };
 
   window.addEventListener('DOMContentLoaded', async () => {
+    window.api.logMain({ type: 'start' });
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest('button,a');
+      if (el) {
+        window.api.logMain({
+          type: 'click',
+          id: el.id || '',
+          text: (el.textContent || '').trim().slice(0, 50),
+        });
+      }
+    });
     initLazyObserver();
     const data = await window.api.loadData();
     state.feeds = normalizeFeeds(data.feeds || []);
@@ -1843,6 +1858,7 @@ settingsBtn.onclick = () => {
     <div>Default Feed: <select id="defaultFeed"><option value="*">All Recent</option>${state.feeds.map(f => `<option value="${f.url}">${f.title || f.url}</option>`).join('')}</select></div>
     <div>Layout: <select id="layoutSel"><option value="sidebar">Sidebar</option><option value="bottom">Bottom Bar</option><option value="gallery">Gallery</option></select></div>
     <div>Text Size: <input type="number" id="textSize" min="12" max="30" value="${state.prefs.textSize || 18}"/></div>
+    <button id="viewMainLogs">View Main Log</button>
     <button id="viewLogs">View AI Log</button>
     <button id="closeSettings">Close</button>`;
   settingsModal.style.display = 'flex';
@@ -1851,6 +1867,9 @@ settingsBtn.onclick = () => {
   document.getElementById('defaultFeed').value = state.prefs.defaultFeed || '*';
   document.getElementById('layoutSel').value = state.prefs.layout || 'sidebar';
   document.getElementById('textSize').value = state.prefs.textSize || 18;
+  document.getElementById('viewMainLogs').onclick = () => {
+    window.api.openMainLog();
+  };
   document.getElementById('viewLogs').onclick = () => {
     window.api.openAiLog();
   };

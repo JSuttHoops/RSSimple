@@ -17,4 +17,6 @@ contextBridge.exposeInMainWorld('api', {
   ollamaQuery: (opts) => ipcRenderer.invoke('ollama-query', opts),
   logAiSearch: (info) => ipcRenderer.invoke('log-ai-search', info),
   openAiLog: () => ipcRenderer.invoke('open-ai-log'),
+  logMain: (info) => ipcRenderer.invoke('log-main', info),
+  openMainLog: () => ipcRenderer.invoke('open-main-log'),
 });
