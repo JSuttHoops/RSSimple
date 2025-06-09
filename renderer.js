@@ -18,6 +18,8 @@ const readerBar = document.getElementById('readerBar');
 const toggleReader = document.getElementById('toggleReader');
 const webModeBtn = document.getElementById('webMode');
 const summaryBtn = document.getElementById('summaryBtn');
+const backBtn = document.getElementById('backBtn');
+const dailySummaryBtn = document.getElementById('dailySummaryBtn');
 const fontSelect = document.getElementById('fontSelect');
 const bgColor = document.getElementById('bgColor');
 const allFeedsBtn = document.getElementById('allFeeds');
@@ -146,6 +148,95 @@ function normalizeFeeds(feeds) {
     if (typeof f === 'string') return { url: f, title: '', tags: [] };
     if (!f.tags) f.tags = [];
     return f;
+  });
+}
+
+async function showDailySummary() {
+  const today = new Date().toISOString().slice(0, 10);
+  let list = Object.values(state.articles).flat();
+  list = list.filter(a => (a.isoDate || a.pubDate || '').startsWith(today));
+  if (!list.length) {
+    alert('No articles from today');
+    return;
+  }
+  const text = list
+    .map(a => `- ${a.title} (${a.feedTitle || ''})`)
+    .join('\n')
+    .slice(0, 8000);
+  return new Promise(async (res) => {
+    aiContent.innerHTML = `<div>` +
+      `<div style="margin-bottom:8px;">Model: <select id="sumModel"></select></div>` +
+      `<div id="sumChat" class="chat"></div>` +
+      `<div style="display:flex;gap:6px;margin-bottom:8px;">` +
+      `<input id="sumQuery" style="flex:1;" placeholder="Ask about these articles"/>` +
+      `<button id="sumAsk">Send</button>` +
+      `<button id="sumDo">Summarize</button>` +
+      `<button id="sumClose">Close</button>` +
+      `</div>` +
+      `<div style="font-size:12px;margin-top:6px;opacity:0.7;">Ensure Ollama is running. Lightweight models like llama3 or phi3 are recommended.</div>` +
+      `</div>`;
+    aiModal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    const models = await window.api.listOllamaModels();
+    const sel = document.getElementById('sumModel');
+    models.forEach(m => {
+      const o = document.createElement('option');
+      o.value = m;
+      o.textContent = m;
+      sel.appendChild(o);
+    });
+    const chat = document.getElementById('sumChat');
+    const qInput = document.getElementById('sumQuery');
+    const addMsg = (html, who) => {
+      const div = document.createElement('div');
+      div.className = `msg ${who}`;
+      div.innerHTML = html;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    };
+    const close = () => {
+      aiModal.style.display = 'none';
+      document.body.style.overflow = '';
+      res();
+    };
+    document.getElementById('sumClose').onclick = close;
+    aiModal.onclick = close;
+    aiContent.onclick = (e) => e.stopPropagation();
+    document.getElementById('sumDo').onclick = async () => {
+      addMsg('Summarizing...', 'ai');
+      const model = sel.value;
+      const prompt = `Summarize the articles below in bullet points.\n${text}`;
+      let out;
+      try {
+        out = await window.api.ollamaQuery({ model, prompt });
+      } catch (e) {
+        console.error(e);
+        chat.lastChild.textContent = 'Unable to connect to AI service.';
+        return;
+      }
+      chat.lastChild.innerHTML = parseMarkdown(out.trim());
+    };
+    document.getElementById('sumAsk').onclick = async () => {
+      const q = qInput.value.trim();
+      if (!q) return;
+      addMsg(sanitize(q), 'user');
+      qInput.value = '';
+      addMsg('Thinking...', 'ai');
+      const model = sel.value;
+      const prompt = `Answer the question using only the articles below.\nArticles:\n${text}\nQuestion: ${q}`;
+      let out;
+      try {
+        out = await window.api.ollamaQuery({ model, prompt });
+      } catch (e) {
+        console.error(e);
+        chat.lastChild.textContent = 'Unable to connect to AI service.';
+        return;
+      }
+      chat.lastChild.innerHTML = parseMarkdown(out.trim());
+    };
+    qInput.onkeypress = (e) => {
+      if (e.key === 'Enter') document.getElementById('sumAsk').click();
+    };
   });
 }
 
@@ -698,6 +789,12 @@ async function showArticle(a) {
   const readerDiv = modalContent.querySelector('.reader');
   readerDiv.dataset.raw = content;
   readerDiv.innerHTML = content;
+  readerDiv.querySelectorAll('a[href]').forEach(aEl => {
+    aEl.addEventListener('click', e => {
+      e.preventDefault();
+      showWebLink(aEl.href);
+    });
+  });
   applyReaderPrefs();
   modal.style.display = 'flex';
   document.body.style.overflow = 'hidden';
@@ -711,8 +808,20 @@ async function showArticle(a) {
   const webview = modalContent.querySelector('#webContainer webview');
   webview.src = a.link;
   modalContent.querySelector('#webContainer').style.display = 'none';
+  backBtn.style.display = 'none';
   state.read[a.link] = true;
   scheduleSave();
+}
+
+function showWebLink(url) {
+  const readerDiv = modalContent.querySelector('.reader');
+  const webDiv = modalContent.querySelector('#webContainer');
+  const webview = webDiv.querySelector('webview');
+  webview.src = url;
+  readerDiv.style.display = 'none';
+  webDiv.style.display = 'block';
+  backBtn.style.display = 'inline-block';
+  webViewMode = true;
 }
 
 function showOfflineItem(item) {
@@ -1021,14 +1130,29 @@ webModeBtn.onclick = () => {
   if (webViewMode) {
     webDiv.style.display = 'block';
     readerDiv.style.display = 'none';
+    backBtn.style.display = 'inline-block';
   } else {
     webDiv.style.display = 'none';
     readerDiv.style.display = 'block';
+    backBtn.style.display = 'none';
   }
 };
 
 summaryBtn.onclick = () => {
   showSummary();
+};
+
+dailySummaryBtn.onclick = () => {
+  showDailySummary();
+};
+
+backBtn.onclick = () => {
+  const readerDiv = modalContent.querySelector('.reader');
+  const webDiv = modalContent.querySelector('#webContainer');
+  webDiv.style.display = 'none';
+  readerDiv.style.display = 'block';
+  backBtn.style.display = 'none';
+  webViewMode = false;
 };
 
 async function downloadArticle(a) {
