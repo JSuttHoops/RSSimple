@@ -38,9 +38,19 @@ const audioContent = document.getElementById('audioContent');
 const exploreBtn = document.getElementById('exploreBtn');
 const rssControls = document.getElementById('rssControls');
 const podcastControls = document.getElementById('podcastControls');
-const aiSearchBtn = document.getElementById('aiSearchBtn');
+const aiToggle = document.getElementById('aiToggle');
+const modelSelect = document.getElementById('modelSelect');
 const aiModal = document.getElementById('aiModal');
 const aiContent = document.getElementById('aiContent');
+let modelsLoaded = false;
+aiToggle.onchange = async () => {
+  modelSelect.style.display = aiToggle.checked ? 'inline' : 'none';
+  if (aiToggle.checked && !modelsLoaded) {
+    const models = await window.api.listOllamaModels();
+    modelSelect.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+    modelsLoaded = true;
+  }
+};
 allFeedsBtn.dataset.feed = '*';
 favoritesBtn.dataset.feed = 'favorites';
 favFeedsBtn.dataset.feed = 'favfeeds';
@@ -572,6 +582,59 @@ function renderAiArticles(el, list) {
   el.appendChild(frag);
 }
 
+async function performAiSearch(query) {
+  const model = modelSelect.value;
+  const hasDate = /\b(?:today|yesterday|week|month|year|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|\d{4})\b/i.test(query);
+  let all = Object.values(state.articles).flat();
+  if (!hasDate) {
+    const start = Date.now() - 7 * 86400000;
+    all = all.filter(a => new Date(a.isoDate || a.pubDate || 0).getTime() >= start);
+  }
+  const qWords = new Set(query.toLowerCase().split(/\W+/).filter(Boolean));
+  const scored = all.map((a, idx) => {
+    const tWords = new Set(a.title.toLowerCase().split(/\W+/).filter(Boolean));
+    let score = 0;
+    for (const w of tWords) if (qWords.has(w)) score++;
+    return { a, idx, score };
+  });
+  scored.sort((x, y) => y.score - x.score);
+  const top = scored.slice(0, 50);
+  const docs = top.map(({ a }, i) => {
+    const date = (a.isoDate || a.pubDate || '').slice(0, 10);
+    const meta = [a.feedTitle, date].filter(Boolean).join(' ');
+    return `${i + 1}. "${a.title}"${meta ? ` (${meta})` : ''}`;
+  }).join('\n');
+  const prompt =
+    `You are a search assistant. Ignore any earlier questions and focus solely on the query below. Choose the articles whose TITLES best match the question. Metadata is only for reference. Reply ONLY with a comma-separated list of the numbers that best answer the question or "none".\nArticles:\n${docs}\nQuestion: ${query}\nAnswer:`;
+  articlesDiv.innerHTML = 'Thinking...';
+  let out;
+  try {
+    out = await window.api.ollamaQuery({ model, prompt });
+  } catch (e) {
+    console.error(e);
+    articlesDiv.textContent = 'Unable to connect to AI service.';
+    return;
+  }
+  if (/^Error:/i.test(out.trim())) {
+    articlesDiv.textContent = out.trim();
+    window.api.logAiSearch({ query, results: out.trim() });
+    return;
+  }
+  const firstLine = out.trim().split(/\n/)[0];
+  const nums =
+    /none/i.test(firstLine)
+      ? []
+      : (firstLine.match(/\b\d+\b/g) || []).map(n => parseInt(n, 10) - 1);
+  const results = nums.map(i => top[i]?.a).filter(Boolean);
+  if (results.length) {
+    renderAiArticles(articlesDiv, results);
+  } else {
+    articlesDiv.innerHTML = parseMarkdown(out.trim());
+  }
+  const titles = results.length ? results.map(r => r.title).join('; ') : out.trim();
+  window.api.logAiSearch({ query, results: titles });
+}
+
 async function showArticle(a) {
   currentArticle = a;
   let raw = a.content;
@@ -806,93 +869,11 @@ function showFeedSearch() {
   });
 }
 
+/*
 async function showAiSearch() {
-  return new Promise(async (res) => {
-    aiContent.innerHTML = '<div id="aiLoading">Loading models...</div>';
-    aiModal.style.display = 'flex';
-    document.body.style.overflow = 'hidden';
-    const models = await window.api.listOllamaModels();
-    const opts = models.map(m => `<option value="${m}">${m}</option>`).join('');
-    aiContent.innerHTML = `<div>` +
-      `<div style="margin-bottom:8px;">Model: <select id="aiModel">${opts}</select></div>` +
-      `<input id="aiQuery" style="width:100%;margin-bottom:8px;" placeholder="Ask the LLM"/>` +
-      `<div style="display:flex;gap:6px;margin-bottom:8px;">` +
-      `<button id="aiGo">Search</button><button id="aiClose">Close</button>` +
-      `</div>` +
-      `<div id="aiResult" style="max-height:300px;overflow:auto;margin-top:4px;"></div>` +
-      `<div style="font-size:12px;margin-top:6px;opacity:0.7;">Ensure Ollama is running. Lightweight models like llama3 or phi3 are recommended.</div>` +
-      `</div>`;
-    const sel = document.getElementById('aiModel');
-    const close = () => {
-      aiModal.style.display = 'none';
-      document.body.style.overflow = '';
-      res();
-    };
-    document.getElementById('aiClose').onclick = close;
-    aiModal.onclick = close;
-    aiContent.onclick = (e) => e.stopPropagation();
-    document.getElementById('aiGo').onclick = async () => {
-      const query = document.getElementById('aiQuery').value.trim();
-      if (!query) return;
-      const model = sel.value;
-      const hasDate = /\b(?:today|yesterday|week|month|year|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|\d{4})\b/i.test(query);
-      let all = Object.values(state.articles).flat();
-      if (!hasDate) {
-        const start = Date.now() - 7 * 86400000;
-        all = all.filter(a => new Date(a.isoDate || a.pubDate || 0).getTime() >= start);
-      }
-      const qWords = new Set(query.toLowerCase().split(/\W+/).filter(Boolean));
-      const scored = all.map((a, idx) => {
-        const tWords = new Set(a.title.toLowerCase().split(/\W+/).filter(Boolean));
-        let score = 0;
-        for (const w of tWords) if (qWords.has(w)) score++;
-        return { a, idx, score };
-      });
-      scored.sort((x, y) => y.score - x.score);
-      const top = scored.slice(0, 50);
-      const docs = top.map(({ a }, i) => {
-        const date = (a.isoDate || a.pubDate || '').slice(0, 10);
-        const meta = [a.feedTitle, date].filter(Boolean).join(' ');
-        return `${i + 1}. "${a.title}"${meta ? ` (${meta})` : ''}`;
-      }).join('\n');
-      const prompt =
-        `You are a search assistant. Ignore any earlier questions and focus solely on the query below. Choose the articles whose TITLES best match the question. Metadata is only for reference. Reply ONLY with a comma-separated list of the numbers that best answer the question or "none".\nArticles:\n${docs}\nQuestion: ${query}\nAnswer:`;
-      const resultEl = document.getElementById('aiResult');
-      resultEl.textContent = 'Thinking...';
-      let out;
-      try {
-        out = await window.api.ollamaQuery({ model, prompt });
-      } catch (e) {
-        console.error(e);
-        resultEl.textContent = 'Unable to connect to AI service.';
-        return;
-      }
-      if (/^Error:/i.test(out.trim())) {
-        resultEl.textContent = out.trim();
-        window.api.logAiSearch({ query, results: out.trim() });
-        return;
-      }
-      const firstLine = out.trim().split(/\n/)[0];
-      const nums =
-        /none/i.test(firstLine)
-          ? []
-          : (firstLine.match(/\b\d+\b/g) || []).map(n => parseInt(n, 10) - 1);
-      const results = nums.map(i => top[i]?.a).filter(Boolean);
-      if (results.length) {
-        renderAiArticles(resultEl, results);
-      } else {
-        resultEl.innerHTML = parseMarkdown(out.trim());
-      }
-      const titles = results.length ? results.map(r => r.title).join('; ') : out.trim();
-      window.api.logAiSearch({ query, results: titles });
-    };
-    const qInput = document.getElementById('aiQuery');
-    qInput.onkeypress = (e) => {
-      if (e.key === 'Enter') document.getElementById('aiGo').click();
-    };
-    qInput.focus();
-  });
+  // Modal-based AI search is deprecated.
 }
+*/
 
 async function showSummary() {
   if (!currentArticle) return;
@@ -1379,8 +1360,13 @@ let searchTimer = null;
 searchInput.onkeyup = () => {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => {
-    searchText = searchInput.value.toLowerCase();
-    updateArticleDisplay();
+    const val = searchInput.value.trim();
+    if (aiToggle.checked) {
+      if (val) performAiSearch(val);
+    } else {
+      searchText = val.toLowerCase();
+      updateArticleDisplay();
+    }
   }, 150);
 };
 
@@ -1486,10 +1472,6 @@ newsLibBtn.onclick = () => {
 
 exploreBtn.onclick = () => {
   showFeedSearch();
-};
-
-aiSearchBtn.onclick = () => {
-  showAiSearch();
 };
 
 newsSearch.oninput = () => {
