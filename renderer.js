@@ -129,7 +129,11 @@ function renderError(el, msg) {
 }
 
 function normalizeFeeds(feeds) {
-  return feeds.map(f => (typeof f === 'string' ? { url: f, title: '' } : f));
+  return feeds.map(f => {
+    if (typeof f === 'string') return { url: f, title: '', tags: [] };
+    if (!f.tags) f.tags = [];
+    return f;
+  });
 }
 
 function renderFeeds() {
@@ -166,8 +170,10 @@ function renderFeeds() {
     edit.onclick = async (e) => {
       e.stopPropagation();
       const val = await showPrompt('Feed Name', '', title);
-      if (val) {
+      if (val !== null) {
         feed.title = val;
+        const tags = await showTagPrompt(feed.tags || []);
+        if (tags) feed.tags = tags;
         scheduleSave();
         renderFeeds();
       }
@@ -188,6 +194,12 @@ function renderFeeds() {
     row.appendChild(btn);
     row.appendChild(edit);
     row.appendChild(del);
+    if (feed.tags && feed.tags.length) {
+      const span = document.createElement('span');
+      span.className = 'feed-tags';
+      span.textContent = '[' + feed.tags.join(', ') + ']';
+      row.appendChild(span);
+    }
     frag.appendChild(row);
   });
   feedsDiv.appendChild(frag);
@@ -683,6 +695,49 @@ function showPrompt(label, placeholder = '', value = '') {
   });
 }
 
+function getAllTags() {
+  const set = new Set();
+  state.feeds.forEach(f => (f.tags || []).forEach(t => set.add(t)));
+  return Array.from(set).sort();
+}
+
+function showTagPrompt(selected = []) {
+  const all = getAllTags();
+  return new Promise((res) => {
+    const opts = all
+      .map(t => `<label><input type="checkbox" value="${sanitize(t)}"${
+        selected.includes(t) ? ' checked' : ''}> ${sanitize(t)}</label>`)
+      .join(' ');
+    dialogContent.innerHTML =
+      `<div><div style="margin-bottom:8px;">Tags</div>` +
+      `<div id="tagOpts" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">${opts}</div>` +
+      `<input id="tagInput" style="width:100%;margin-bottom:8px;" placeholder="comma separated"/>` +
+      `<div style="display:flex;gap:6px;">` +
+      `<button id="tagOk">OK</button><button id="tagCancel">Cancel</button>` +
+      `</div></div>`;
+    dialogModal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    const input = document.getElementById('tagInput');
+    const extra = selected.filter(t => !all.includes(t)).join(', ');
+    input.value = extra;
+    const close = (val) => {
+      dialogModal.style.display = 'none';
+      document.body.style.overflow = '';
+      res(val);
+    };
+    dialogModal.onclick = () => close(null);
+    dialogContent.onclick = (e) => e.stopPropagation();
+    document.getElementById('tagOk').onclick = () => {
+      const checked = Array.from(document.querySelectorAll('#tagOpts input:checked')).map(c => c.value);
+      const entered = input.value.split(',').map(t => t.trim()).filter(Boolean);
+      const tags = Array.from(new Set([...checked, ...entered]));
+      close(tags);
+    };
+    document.getElementById('tagCancel').onclick = () => close(null);
+    input.focus();
+  });
+}
+
 function showFeedSearch() {
   return new Promise((res) => {
     dialogContent.innerHTML = `<div>` +
@@ -724,7 +779,8 @@ function showFeedSearch() {
               alert('Failed to add feed: ' + res.error);
               return;
             }
-            state.feeds.push({ url: item.url, title: res.feedTitle || item.title, image: res.image });
+            const tags = await showTagPrompt();
+            state.feeds.push({ url: item.url, title: res.feedTitle || item.title, image: res.image, tags });
             state.articles[item.url] = res.items;
             scheduleSave();
             renderFeeds();
@@ -1150,7 +1206,8 @@ addFeedBtn.onclick = async () => {
     alert('Failed to add feed: ' + res.error);
     return;
   }
-  state.feeds.push({ url, title: res.feedTitle || url, image: res.image });
+  const tags = await showTagPrompt();
+  state.feeds.push({ url, title: res.feedTitle || url, image: res.image, tags });
   state.articles[url] = res.items;
   scheduleSave();
   renderFeeds();
