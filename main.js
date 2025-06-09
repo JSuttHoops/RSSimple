@@ -20,6 +20,7 @@ const FEED_DIR = path.join(USER_DIR, 'feeds');
 const OPML_FILE = path.join(FEED_DIR, 'feeds.opml');
 const OFFLINE_DIR = path.join(USER_DIR, 'offline');
 const OLLAMA_URL = 'http://localhost:11434';
+const OLLAMA_CTX = 8192; // tokens to allocate per request
 
 function ensureFeedDir() {
   if (!fs.existsSync(FEED_DIR)) {
@@ -276,7 +277,12 @@ ipcMain.handle('ollama-query', async (_e, { model, prompt }) => {
     const res = await fetch(`${OLLAMA_URL}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, prompt, stream: false })
+      body: JSON.stringify({
+        model,
+        prompt,
+        stream: false,
+        options: { num_ctx: OLLAMA_CTX }
+      })
     });
     const json = await res.json();
     return json.response;

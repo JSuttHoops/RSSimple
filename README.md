@@ -53,10 +53,12 @@ Now includes a sidebar feed list with filtering and editable feed names.
    ollama serve
    ```
 2. Pull a model with good context length. Lightweight options like `phi3` or `llama3` work well:
-   ```bash
-   ollama pull phi3
-   ```
+ ```bash
+  ollama pull phi3
+  ```
 3. Run RSSimple with `npm start`.
+   RSSimple requests an 8k token context window for each search so recent articles
+   fit in one prompt. Models with smaller limits will use their maximum context.
 4. Click the **AI Search** button next to the regular search box.
 5. Pick a model from the dropdown, type your question and hit **Search**.
 
