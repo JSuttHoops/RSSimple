@@ -11,8 +11,9 @@ const parser = new RSSParser({
     ]
   }
 });
-const { JSDOM } = require('jsdom');
+const { JSDOM, VirtualConsole } = require('jsdom');
 const { Readability } = require('@mozilla/readability');
+const silentConsole = new VirtualConsole();
 
 const USER_DIR = app.getPath('userData');
 const DATA_FILE = path.join(USER_DIR, 'data.json');
@@ -155,7 +156,7 @@ ipcMain.handle('fetch-feed', async (_e, url) => {
       try {
         const res = await fetch(i.link);
         const html = await res.text();
-        const dom = new JSDOM(html, { url: i.link });
+        const dom = new JSDOM(html, { url: i.link, virtualConsole: silentConsole });
         const imgEl = dom.window.document.querySelector('img');
         if (imgEl) image = imgEl.src;
       } catch {}
@@ -241,7 +242,7 @@ ipcMain.handle('download-article', async (_e, { url, title }) => {
   const html = await res.text();
   let content = html;
   try {
-    const dom = new JSDOM(html, { url });
+    const dom = new JSDOM(html, { url, virtualConsole: silentConsole });
     const parsed = new Readability(dom.window.document).parse();
     if (parsed && parsed.content) content = parsed.content;
   } catch {}
@@ -268,7 +269,7 @@ ipcMain.handle('download-episode', async (_e, { url, title }) => {
 ipcMain.handle('reader-parse', async (_e, url) => {
   const res = await fetch(url);
   const html = await res.text();
-  const dom = new JSDOM(html, { url });
+  const dom = new JSDOM(html, { url, virtualConsole: silentConsole });
   const article = new Readability(dom.window.document).parse();
   return article.content;
 });

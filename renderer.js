@@ -838,7 +838,6 @@ async function showArticle(a) {
     raw = `<p><a href="${a.link}" target="_blank">Open Link</a></p>`;
   }
   const content = parsed || raw;
-  const safe = stripStyles(content);
   if (!a.image) {
     try {
       const doc = new DOMParser().parseFromString(content, 'text/html');
@@ -863,8 +862,8 @@ async function showArticle(a) {
        <webview src="" style="width:100%;height:100%;border:0"></webview>
      </div>`;
   const readerDiv = modalContent.querySelector('.reader');
-  readerDiv.dataset.raw = safe;
-  readerDiv.innerHTML = safe;
+  readerDiv.dataset.raw = content;
+  readerDiv.innerHTML = content;
   readerDiv.querySelectorAll('a[href]').forEach(aEl => {
     aEl.addEventListener('click', e => {
       e.preventDefault();
@@ -945,10 +944,6 @@ function sanitize(text) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-function stripStyles(html) {
-  return html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
 }
 
 function parseMarkdown(text) {
@@ -1213,7 +1208,7 @@ toggleReader.onclick = async () => {
   const readerDiv = modalContent.querySelector('.reader');
   if (readerMode && readerDiv && readerDiv.dataset.raw) {
     const parsed = await window.api.parseReader(readerDiv.dataset.link);
-    readerDiv.innerHTML = stripStyles(parsed);
+    readerDiv.innerHTML = parsed;
   } else if (readerDiv) {
     readerDiv.innerHTML = readerDiv.dataset.raw;
   }
