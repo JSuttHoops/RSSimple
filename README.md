@@ -43,3 +43,20 @@ Now includes a sidebar feed list with filtering and editable feed names.
 - Episode lists show cover art with Play and Download options.
 - Transcripts are stored when available so episodes appear in search results.
 - Organise feeds visually in the News Library with custom logos.
+- AI Search powered by local Ollama models.
+
+## AI Search Setup
+
+1. Install [Ollama](https://ollama.ai) and make sure it is running:
+   ```bash
+   ollama serve
+   ```
+2. Pull a model with good context length. Lightweight options like `phi3` or `llama3` work well:
+   ```bash
+   ollama pull phi3
+   ```
+3. Run RSSimple with `npm start`.
+4. Click the **AI Search** button next to the regular search box.
+5. Pick a model from the dropdown, type your question and hit **Search**.
+
+The app sends each article's headline, a short snippet, any categories, the feed name and the publication date to your selected model. The model replies with the numbers of the most relevant articles so you can open them in reader or normal view.

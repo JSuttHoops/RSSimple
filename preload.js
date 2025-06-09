@@ -13,4 +13,6 @@ contextBridge.exposeInMainWorld('api', {
   parseReader: (url) => ipcRenderer.invoke('reader-parse', url),
   openLink: (url) => ipcRenderer.invoke('open-link', url),
   fetchBluesky: (handle) => ipcRenderer.invoke('fetch-bluesky', handle),
+  listOllamaModels: () => ipcRenderer.invoke('list-ollama-models'),
+  ollamaQuery: (opts) => ipcRenderer.invoke('ollama-query', opts),
 });

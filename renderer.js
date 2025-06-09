@@ -37,6 +37,9 @@ const audioContent = document.getElementById('audioContent');
 const exploreBtn = document.getElementById('exploreBtn');
 const rssControls = document.getElementById('rssControls');
 const podcastControls = document.getElementById('podcastControls');
+const aiSearchBtn = document.getElementById('aiSearchBtn');
+const aiModal = document.getElementById('aiModal');
+const aiContent = document.getElementById('aiContent');
 allFeedsBtn.dataset.feed = '*';
 favoritesBtn.dataset.feed = 'favorites';
 favFeedsBtn.dataset.feed = 'favfeeds';
@@ -425,6 +428,17 @@ function renderArticles(articles) {
     strong.textContent = a.title;
     title.appendChild(strong);
     div.appendChild(title);
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const date = (a.isoDate || a.pubDate || '').slice(0, 10);
+    let info = '';
+    if (a.feedTitle) info += a.feedTitle;
+    if (date) info += (info ? ' ' : '') + date;
+    if (a.categories && a.categories.length) {
+      info += (info ? ' [' : '[') + a.categories.join(', ') + ']';
+    }
+    meta.textContent = info;
+    div.appendChild(meta);
     if (a.feedTitle) {
       const source = document.createElement('div');
       source.className = 'feed-label';
@@ -490,6 +504,58 @@ function renderOffline(list) {
     frag.appendChild(div);
   });
   articlesDiv.appendChild(frag);
+}
+
+function renderAiArticles(el, list) {
+  el.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  list.forEach(a => {
+    const div = document.createElement('div');
+    div.className = 'article';
+    if (a.image) {
+      const img = document.createElement('img');
+      img.src = a.image;
+      img.loading = 'lazy';
+      div.appendChild(img);
+    }
+    const title = document.createElement('div');
+    const strong = document.createElement('strong');
+    strong.textContent = a.title;
+    title.appendChild(strong);
+    div.appendChild(title);
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const date = (a.isoDate || a.pubDate || '').slice(0, 10);
+    let info = '';
+    if (a.feedTitle) info += a.feedTitle;
+    if (date) info += (info ? ' ' : '') + date;
+    if (a.categories && a.categories.length) {
+      info += (info ? ' [' : '[') + a.categories.join(', ') + ']';
+    }
+    meta.textContent = info;
+    div.appendChild(meta);
+    if (a.summary) {
+      const summary = document.createElement('div');
+      summary.className = 'summary';
+      summary.textContent = a.summary;
+      div.appendChild(summary);
+    }
+    const btns = document.createElement('div');
+    btns.className = 'article-buttons';
+    const readBtn = document.createElement('button');
+    readBtn.className = 'article-btn btn';
+    readBtn.textContent = 'Read';
+    readBtn.onclick = (e) => { e.stopPropagation(); showArticle(a); };
+    const openBtn = document.createElement('button');
+    openBtn.className = 'article-btn btn';
+    openBtn.textContent = 'Open';
+    openBtn.onclick = (e) => { e.stopPropagation(); window.api.openLink(a.link); };
+    btns.appendChild(readBtn);
+    btns.appendChild(openBtn);
+    div.appendChild(btns);
+    frag.appendChild(div);
+  });
+  el.appendChild(frag);
 }
 
 async function showArticle(a) {
@@ -671,6 +737,66 @@ function showFeedSearch() {
       }
     };
     termInput.focus();
+  });
+}
+
+async function showAiSearch() {
+  return new Promise(async (res) => {
+    aiContent.innerHTML = `<div>` +
+      `<div style="margin-bottom:8px;">Model: <select id="aiModel"></select></div>` +
+      `<input id="aiQuery" style="width:100%;margin-bottom:8px;" placeholder="Ask the LLM"/>` +
+      `<div style="display:flex;gap:6px;margin-bottom:8px;">` +
+      `<button id="aiGo">Search</button><button id="aiClose">Close</button>` +
+      `</div>` +
+      `<div id="aiResult" style="max-height:300px;overflow:auto;margin-top:4px;"></div>` +
+      `<div style="font-size:12px;margin-top:6px;opacity:0.7;">Ensure Ollama is running. Lightweight models like llama3 or phi3 are recommended.</div>` +
+      `</div>`;
+    aiModal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    const models = await window.api.listOllamaModels();
+    const sel = document.getElementById('aiModel');
+    models.forEach(m => {
+      const o = document.createElement('option');
+      o.value = m;
+      o.textContent = m;
+      sel.appendChild(o);
+    });
+    const close = () => {
+      aiModal.style.display = 'none';
+      document.body.style.overflow = '';
+      res();
+    };
+    document.getElementById('aiClose').onclick = close;
+    aiModal.onclick = close;
+    aiContent.onclick = (e) => e.stopPropagation();
+    document.getElementById('aiGo').onclick = async () => {
+      const query = document.getElementById('aiQuery').value.trim();
+      if (!query) return;
+      const model = sel.value;
+      const all = Object.values(state.articles).flat();
+      const docs = all.slice(0, 200).map((a, i) => {
+        const text = (a.summary || a.content || '').replace(/\s+/g, ' ');
+        const snip = text.split('. ').slice(0, 2).join('. ');
+        const date = (a.isoDate || a.pubDate || '').slice(0, 10);
+        const cats = (a.categories || []).join(', ');
+        const meta = `${a.feedTitle || ''}${date ? ' ' + date : ''}` +
+          (cats ? ` [${cats}]` : '');
+        return `${i + 1}. "${a.title}" (${meta}) - ${snip}`;
+      }).join('\n');
+      const prompt =
+        `You are a search assistant. Below is a numbered list of articles. Reply with a comma-separated list of the numbers that best answer the question or "none".\nArticles:\n${docs}\nQuestion: ${query}`;
+      const resultEl = document.getElementById('aiResult');
+      resultEl.textContent = 'Thinking...';
+      const out = await window.api.ollamaQuery({ model, prompt });
+      const nums = (out.match(/\d+/g) || []).map(n => parseInt(n, 10) - 1);
+      const results = nums.map(i => all[i]).filter(Boolean);
+      if (results.length) {
+        renderAiArticles(resultEl, results);
+      } else {
+        resultEl.textContent = out.trim();
+      }
+    };
+    document.getElementById('aiQuery').focus();
   });
 }
 
@@ -1179,6 +1305,10 @@ newsLibBtn.onclick = () => {
 
 exploreBtn.onclick = () => {
   showFeedSearch();
+};
+
+aiSearchBtn.onclick = () => {
+  showAiSearch();
 };
 
 newsSearch.oninput = () => {
