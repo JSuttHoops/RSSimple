@@ -33,6 +33,7 @@ Now includes a sidebar feed list with filtering and editable feed names.
 - "All Recent" tab aggregates articles from the past week.
 - On startup, feeds are prefetched concurrently and "All Recent" loads by default.
 - Reader mode with adjustable font and background color.
+- Summarize articles with your chosen Ollama model.
 - Improved reader formatting and responsive layout.
 - Hidden scrollbars for a cleaner look.
 - Settings modal for customisation.
