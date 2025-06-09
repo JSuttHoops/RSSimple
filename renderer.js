@@ -22,6 +22,8 @@ const backBtn = document.getElementById('backBtn');
 const dailySummaryBtn = document.getElementById('dailySummaryBtn');
 const fontSelect = document.getElementById('fontSelect');
 const bgColor = document.getElementById('bgColor');
+const uploadFontBtn = document.getElementById('uploadFontBtn');
+const fontFileInput = document.getElementById('fontFile');
 const allFeedsBtn = document.getElementById('allFeeds');
 const refreshAllBtn = document.getElementById('refreshAll');
 const settingsBtn = document.getElementById('settingsBtn');
@@ -561,8 +563,9 @@ function filterArticles(list) {
       (a.content || '') + ' ' +
       (a.transcript || '')
     ).toLowerCase();
-    const date = new Date(a.isoDate || a.pubDate || 0).getTime();
-    return text.includes(searchText) && (!start || date >= start);
+    const rawDate = a.isoDate || a.pubDate;
+    const date = rawDate ? new Date(rawDate).getTime() : NaN;
+    return text.includes(searchText) && (!start || isNaN(date) || date >= start);
   });
 }
 
@@ -902,7 +905,7 @@ async function showArticle(a) {
   webview.src = a.link;
   modalContent.querySelector('#webContainer').style.display = 'none';
   backBtn.style.display = 'none';
-  modalContent.appendChild(readerBar);
+  modal.appendChild(readerBar);
   state.read[a.link] = true;
   scheduleSave();
 }
@@ -930,7 +933,7 @@ function showOfflineItem(item) {
   }
   modalContent.innerHTML =
     `<iframe src="file://${item.file}" style="width:100%;height:80vh;border:0"></iframe>`;
-  modalContent.appendChild(readerBar);
+  modal.appendChild(readerBar);
   modal.style.display = 'flex';
   document.body.style.overflow = 'hidden';
   modal.onclick = () => {
@@ -965,6 +968,37 @@ function sanitize(text) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function addFontOption(name) {
+  if (![...fontSelect.options].some(o => o.value === name)) {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    fontSelect.appendChild(opt);
+  }
+  const setSel = document.getElementById('setFont');
+  if (setSel && ![...setSel.options].some(o => o.value === name)) {
+    const opt2 = document.createElement('option');
+    opt2.value = name;
+    opt2.textContent = name;
+    setSel.appendChild(opt2);
+  }
+}
+
+async function loadCustomFonts() {
+  const fonts = state.prefs.fonts || [];
+  for (const f of fonts) {
+    const file = await window.api.fontPath(f);
+    const base = f.replace(/\.[^/.]+$/, '');
+    if (!document.getElementById('font-' + base)) {
+      const style = document.createElement('style');
+      style.id = 'font-' + base;
+      style.textContent = `@font-face{font-family:'${base}';src:url('file://${file.replace(/\\/g,'/')}');}`;
+      document.head.appendChild(style);
+      addFontOption(base);
+    }
+  }
 }
 
 function formatDate(str, withTime = false) {
@@ -1235,7 +1269,14 @@ function applyReaderPrefs() {
   const bg = state.prefs.bg || '#fff';
   modalContent.style.background = bg;
   modalContent.style.setProperty('--reader-bg', bg);
-  modalContent.style.color = textColorFor(bg);
+  const color = textColorFor(bg);
+  modalContent.style.color = color;
+  readerBar.style.color = color;
+  readerBar.querySelectorAll('button').forEach(btn => {
+    btn.style.color = color;
+    btn.style.background =
+      color === '#fff' ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.85)';
+  });
   fontSelect.value = state.prefs.font || 'sans-serif';
   bgColor.value = bg;
 }
@@ -1776,10 +1817,12 @@ opmlInput.onchange = async () => {
     state.favorites = data.favorites || [];
     state.favoriteFeeds = data.favoriteFeeds || [];
     state.prefs = data.prefs || {};
+    if (!state.prefs.fonts) state.prefs.fonts = [];
     state.podcasts = data.podcasts || [];
     state.episodes = data.episodes || {};
     state.offline = data.offline || [];
     state.read = data.read || {};
+    await loadCustomFonts();
     applyTheme();
     applyLayout();
     showPodcastMode(false);
@@ -1857,9 +1900,9 @@ favFeedsBtn.onclick = async () => {
   updateArticleDisplay();
 };
 
-settingsBtn.onclick = () => {
+settingsBtn.onclick = async () => {
   settingsContent.innerHTML = `<h3>Settings</h3>
-    <div>Font: <select id="setFont"><option value="sans-serif">Sans</option><option value="serif">Serif</option></select></div>
+    <div>Font: <select id="setFont"><option value="sans-serif">Sans</option><option value="serif">Serif</option></select> <button id="uploadFontSettings" class="btn">Upload Font</button></div>
     <div>Background: <input type="color" id="setBg" value="${state.prefs.bg || '#ffffff'}"/></div>
     <div>Theme: <select id="themeSel"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></div>
     <div>Default Feed: <select id="defaultFeed"><option value="*">All Recent</option>${state.feeds.map(f => `<option value="${f.url}">${f.title || f.url}</option>`).join('')}</select></div>
@@ -1869,6 +1912,7 @@ settingsBtn.onclick = () => {
     <button id="viewLogs">View AI Log</button>
     <button id="closeSettings">Close</button>`;
   settingsModal.style.display = 'flex';
+  await loadCustomFonts();
   document.getElementById('setFont').value = state.prefs.font || 'sans-serif';
   document.getElementById('themeSel').value = state.prefs.theme || 'system';
   document.getElementById('defaultFeed').value = state.prefs.defaultFeed || '*';
@@ -1879,6 +1923,9 @@ settingsBtn.onclick = () => {
   };
   document.getElementById('viewLogs').onclick = () => {
     window.api.openAiLog();
+  };
+  document.getElementById('uploadFontSettings').onclick = () => {
+    fontFileInput.click();
   };
   document.getElementById('closeSettings').onclick = () => {
     state.prefs.font = document.getElementById('setFont').value;
@@ -1892,6 +1939,21 @@ settingsBtn.onclick = () => {
     applyLayout();
     scheduleSave();
   };
+};
+
+uploadFontBtn.onclick = () => {
+  fontFileInput.click();
+};
+
+fontFileInput.onchange = async () => {
+  const file = fontFileInput.files[0];
+  if (!file) return;
+  const name = await window.api.addFont(file.path);
+  state.prefs.fonts = state.prefs.fonts || [];
+  if (!state.prefs.fonts.includes(name)) state.prefs.fonts.push(name);
+  await loadCustomFonts();
+  scheduleSave();
+  fontFileInput.value = '';
 };
 
 fontSelect.onchange = () => {

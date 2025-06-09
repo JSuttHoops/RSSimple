@@ -19,4 +19,7 @@ contextBridge.exposeInMainWorld('api', {
   openAiLog: () => ipcRenderer.invoke('open-ai-log'),
   logMain: (info) => ipcRenderer.invoke('log-main', info),
   openMainLog: () => ipcRenderer.invoke('open-main-log'),
+  listFonts: () => ipcRenderer.invoke('list-fonts'),
+  addFont: (file) => ipcRenderer.invoke('add-font', file),
+  fontPath: (name) => ipcRenderer.invoke('font-path', name)
 });
