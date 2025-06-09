@@ -360,6 +360,31 @@
       background: transparent !important;
     }
 
+    .chat {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 200px;
+      overflow: auto;
+      margin-bottom: 8px;
+    }
+
+    .msg {
+      padding: 6px 8px;
+      border-radius: 8px;
+      max-width: 80%;
+    }
+
+    .msg.user {
+      align-self: flex-end;
+      background: rgba(0, 128, 255, 0.2);
+    }
+
+    .msg.ai {
+      align-self: flex-start;
+      background: rgba(0, 0, 0, 0.05);
+    }
+
     #opml {
       display: none;
     }
@@ -481,6 +506,14 @@
 
     body[data-theme='dark'] #readerBar {
       background: rgba(0, 0, 0, 0.4);
+    }
+
+    body[data-theme='dark'] .msg.user {
+      background: rgba(0, 128, 255, 0.3);
+    }
+
+    body[data-theme='dark'] .msg.ai {
+      background: rgba(255, 255, 255, 0.1);
     }
 
     body[data-layout='bottom'] #app {
@@ -614,6 +647,7 @@
     <div class="modal-content" id="audioContent"></div>
   </div>
   <script src="utils/buildTimeline.js"></script>
+  <script src="node_modules/marked/marked.min.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>
