@@ -674,6 +674,13 @@ function sanitize(text) {
     .replace(/'/g, '&#39;');
 }
 
+function parseMarkdown(text) {
+  if (window.marked && typeof window.marked.parse === 'function') {
+    return window.marked.parse(text);
+  }
+  return text.replace(/\n/g, '<br>');
+}
+
 function showPrompt(label, placeholder = '', value = '') {
   return new Promise((res) => {
     dialogContent.innerHTML = `<div><div style="margin-bottom:8px;">${label}</div>` +
@@ -866,7 +873,7 @@ async function showAiSearch() {
       if (results.length) {
         renderAiArticles(resultEl, results);
       } else {
-        resultEl.innerHTML = marked.parse(out.trim());
+        resultEl.innerHTML = parseMarkdown(out.trim());
       }
       const titles = results.length ? results.map(r => r.title).join('; ') : out.trim();
       window.api.logAiSearch({ query, results: titles });
@@ -928,7 +935,7 @@ async function showSummary() {
       const model = sel.value;
       const prompt = `Summarize the article below in bullet points.\n${text}`;
       const out = await window.api.ollamaQuery({ model, prompt });
-      chat.lastChild.innerHTML = marked.parse(out.trim());
+      chat.lastChild.innerHTML = parseMarkdown(out.trim());
     };
     document.getElementById('sumAsk').onclick = async () => {
       const q = qInput.value.trim();
@@ -939,7 +946,7 @@ async function showSummary() {
       const model = sel.value;
       const prompt = `Answer the question using only the article below.\nArticle:\n${text}\nQuestion: ${q}`;
       const out = await window.api.ollamaQuery({ model, prompt });
-      chat.lastChild.innerHTML = marked.parse(out.trim());
+      chat.lastChild.innerHTML = parseMarkdown(out.trim());
     };
     qInput.onkeypress = (e) => {
       if (e.key === 'Enter') document.getElementById('sumAsk').click();
