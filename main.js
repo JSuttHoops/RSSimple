@@ -54,7 +54,8 @@ function parseOPML(filePath) {
         if (node['@_xmlUrl']) {
           arr.push({
             url: node['@_xmlUrl'],
-            title: node['@_title'] || node['@_text'] || node['@_xmlUrl']
+            title: node['@_title'] || node['@_text'] || node['@_xmlUrl'],
+            tags: []
           });
         }
         if (node.outline) arr = arr.concat(collect(node.outline));
@@ -76,6 +77,11 @@ function loadData() {
     if (!data.episodes) data.episodes = {};
     if (!data.offline) data.offline = [];
     if (!data.read) data.read = {};
+    data.feeds = data.feeds.map(f => {
+      if (typeof f === 'string') return { url: f, title: '', tags: [] };
+      if (!f.tags) f.tags = [];
+      return f;
+    });
     if (data.feeds.length === 0 && fs.existsSync(OPML_FILE)) {
       const parsed = parseOPML(OPML_FILE);
       const map = new Map(parsed.map(f => [f.url, f]));
