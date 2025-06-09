@@ -808,8 +808,13 @@ function showFeedSearch() {
 
 async function showAiSearch() {
   return new Promise(async (res) => {
+    aiContent.innerHTML = '<div id="aiLoading">Loading models...</div>';
+    aiModal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    const models = await window.api.listOllamaModels();
+    const opts = models.map(m => `<option value="${m}">${m}</option>`).join('');
     aiContent.innerHTML = `<div>` +
-      `<div style="margin-bottom:8px;">Model: <select id="aiModel"></select></div>` +
+      `<div style="margin-bottom:8px;">Model: <select id="aiModel">${opts}</select></div>` +
       `<input id="aiQuery" style="width:100%;margin-bottom:8px;" placeholder="Ask the LLM"/>` +
       `<div style="display:flex;gap:6px;margin-bottom:8px;">` +
       `<button id="aiGo">Search</button><button id="aiClose">Close</button>` +
@@ -817,16 +822,7 @@ async function showAiSearch() {
       `<div id="aiResult" style="max-height:300px;overflow:auto;margin-top:4px;"></div>` +
       `<div style="font-size:12px;margin-top:6px;opacity:0.7;">Ensure Ollama is running. Lightweight models like llama3 or phi3 are recommended.</div>` +
       `</div>`;
-    aiModal.style.display = 'flex';
-    document.body.style.overflow = 'hidden';
-    const models = await window.api.listOllamaModels();
     const sel = document.getElementById('aiModel');
-    models.forEach(m => {
-      const o = document.createElement('option');
-      o.value = m;
-      o.textContent = m;
-      sel.appendChild(o);
-    });
     const close = () => {
       aiModal.style.display = 'none';
       document.body.style.overflow = '';
