@@ -177,6 +177,7 @@ async function showDailySummary() {
       `</div>`;
     aiModal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
+    const history = [];
     const models = await window.api.listOllamaModels();
     const sel = document.getElementById('sumModel');
     models.forEach(m => {
@@ -205,7 +206,9 @@ async function showDailySummary() {
     document.getElementById('sumDo').onclick = async () => {
       addMsg('Summarizing...', 'ai');
       const model = sel.value;
-      const prompt = `Summarize the articles below in bullet points.\n${text}`;
+      const hist = history.map(h => `${h.who === 'user' ? 'User' : 'Assistant'}: ${h.text}`).join('\n');
+      let prompt = `Summarize the articles below in bullet points.\n${text}`;
+      if (hist) prompt += `\n${hist}`;
       let out;
       try {
         out = await window.api.ollamaQuery({ model, prompt });
@@ -215,15 +218,20 @@ async function showDailySummary() {
         return;
       }
       chat.lastChild.innerHTML = parseMarkdown(out.trim());
+      history.push({ who: 'ai', text: out.trim() });
     };
     document.getElementById('sumAsk').onclick = async () => {
       const q = qInput.value.trim();
       if (!q) return;
       addMsg(sanitize(q), 'user');
+      history.push({ who: 'user', text: q });
       qInput.value = '';
       addMsg('Thinking...', 'ai');
       const model = sel.value;
-      const prompt = `Answer the question using only the articles below.\nArticles:\n${text}\nQuestion: ${q}`;
+      const hist = history.map(h => `${h.who === 'user' ? 'User' : 'Assistant'}: ${h.text}`).join('\n');
+      let prompt = `Answer the question using only the articles below.\nArticles:\n${text}`;
+      if (hist) prompt += `\n${hist}`;
+      prompt += `\nUser: ${q}`;
       let out;
       try {
         out = await window.api.ollamaQuery({ model, prompt });
@@ -233,6 +241,7 @@ async function showDailySummary() {
         return;
       }
       chat.lastChild.innerHTML = parseMarkdown(out.trim());
+      history.push({ who: 'ai', text: out.trim() });
     };
     qInput.onkeypress = (e) => {
       if (e.key === 'Enter') document.getElementById('sumAsk').click();
@@ -776,8 +785,21 @@ async function showArticle(a) {
     raw = `<p><a href="${a.link}" target="_blank">Open Link</a></p>`;
   }
   const content = parsed || raw;
+  if (!a.image) {
+    try {
+      const doc = new DOMParser().parseFromString(content, 'text/html');
+      let imgEl = doc.querySelector('img');
+      if (!imgEl) {
+        const resImg = await fetch(a.link);
+        const htmlImg = await resImg.text();
+        const doc2 = new DOMParser().parseFromString(htmlImg, 'text/html');
+        imgEl = doc2.querySelector('img');
+      }
+      if (imgEl) a.image = imgEl.src;
+    } catch {}
+  }
   const imgPart = a.image
-    ? `<img src="${a.image}" loading="lazy" style="max-width:100%;max-height:400px;margin-bottom:8px;"/>`
+    ? `<img src="${a.image}" loading="lazy" style="width:100%;max-height:400px;margin-bottom:8px;"/>`
     : '';
   modalContent.innerHTML =
     `<h2>${sanitize(a.title)}</h2>` +
@@ -873,6 +895,9 @@ function sanitize(text) {
 
 function parseMarkdown(text) {
   if (window.marked && typeof window.marked.parse === 'function') {
+    if (typeof window.marked.setOptions === 'function') {
+      window.marked.setOptions({ gfm: true, breaks: true });
+    }
     return window.marked.parse(text);
   }
   return text.replace(/\n/g, '<br>');
@@ -951,7 +976,8 @@ function showFeedSearch() {
       `<input id="feedSearchTerm" style="width:100%;margin-bottom:8px;" placeholder="Search feeds"/>` +
       `<div id="feedResults" style="max-height:300px;overflow:auto;margin-bottom:8px;"></div>` +
       `<div style="display:flex;gap:6px;justify-content:flex-end;">` +
-      `<button id="closeExplore">Close</button>` +
+      `<button id="feedSearchGo" class="btn">Search</button>` +
+      `<button id="closeExplore" class="btn">Close</button>` +
       `</div></div>`;
     dialogModal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
@@ -965,40 +991,42 @@ function showFeedSearch() {
     document.getElementById('closeExplore').onclick = close;
     dialogModal.onclick = close;
     dialogContent.onclick = (e) => e.stopPropagation();
-    termInput.onkeypress = async (e) => {
-      if (e.key === 'Enter') {
-        resultsDiv.textContent = 'Searching...';
-        const list = await window.api.searchFeeds(termInput.value);
-        resultsDiv.innerHTML = '';
-        list.forEach(item => {
-          const row = document.createElement('div');
-          row.style.display = 'flex';
-          row.style.justifyContent = 'space-between';
-          row.style.marginBottom = '4px';
-          const title = document.createElement('span');
-          title.textContent = item.title;
-          const add = document.createElement('button');
-          add.className = 'btn';
-          add.textContent = 'Add';
-          add.onclick = async () => {
-            const res = await window.api.fetchFeed(item.url);
-            if (res.error) {
-              alert('Failed to add feed: ' + res.error);
-              return;
-            }
-            const tags = await showTagPrompt();
-            state.feeds.push({ url: item.url, title: res.feedTitle || item.title, image: res.image, tags });
-            state.articles[item.url] = res.items;
-            scheduleSave();
-            renderFeeds();
-            add.textContent = 'Added';
-          };
-          row.appendChild(title);
-          row.appendChild(add);
-          resultsDiv.appendChild(row);
-        });
-      }
+    const doSearch = async () => {
+      resultsDiv.textContent = 'Searching...';
+      const list = await window.api.searchFeeds(termInput.value);
+      resultsDiv.innerHTML = '';
+      list.forEach(item => {
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.justifyContent = 'space-between';
+        row.style.marginBottom = '4px';
+        const title = document.createElement('span');
+        title.textContent = item.title;
+        const add = document.createElement('button');
+        add.className = 'btn';
+        add.textContent = 'Add';
+        add.onclick = async () => {
+          const res = await window.api.fetchFeed(item.url);
+          if (res.error) {
+            alert('Failed to add feed: ' + res.error);
+            return;
+          }
+          const tags = await showTagPrompt();
+          state.feeds.push({ url: item.url, title: res.feedTitle || item.title, image: res.image, tags });
+          state.articles[item.url] = res.items;
+          scheduleSave();
+          renderFeeds();
+          add.textContent = 'Added';
+        };
+        row.appendChild(title);
+        row.appendChild(add);
+        resultsDiv.appendChild(row);
+      });
     };
+    termInput.onkeydown = (e) => {
+      if (e.key === 'Enter') doSearch();
+    };
+    document.getElementById('feedSearchGo').onclick = doSearch;
     termInput.focus();
   });
 }
@@ -1028,6 +1056,7 @@ async function showSummary() {
       `</div>`;
     aiModal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
+    const history = [];
     const models = await window.api.listOllamaModels();
     const sel = document.getElementById('sumModel');
     models.forEach(m => {
@@ -1056,7 +1085,9 @@ async function showSummary() {
     document.getElementById('sumDo').onclick = async () => {
       addMsg('Summarizing...', 'ai');
       const model = sel.value;
-      const prompt = `Summarize the article below in bullet points.\n${text}`;
+      const hist = history.map(h => `${h.who === 'user' ? 'User' : 'Assistant'}: ${h.text}`).join('\n');
+      let prompt = `Summarize the article below in bullet points.\n${text}`;
+      if (hist) prompt += `\n${hist}`;
       let out;
       try {
         out = await window.api.ollamaQuery({ model, prompt });
@@ -1066,15 +1097,20 @@ async function showSummary() {
         return;
       }
       chat.lastChild.innerHTML = parseMarkdown(out.trim());
+      history.push({ who: 'ai', text: out.trim() });
     };
     document.getElementById('sumAsk').onclick = async () => {
       const q = qInput.value.trim();
       if (!q) return;
       addMsg(sanitize(q), 'user');
+      history.push({ who: 'user', text: q });
       qInput.value = '';
       addMsg('Thinking...', 'ai');
       const model = sel.value;
-      const prompt = `Answer the question using only the article below.\nArticle:\n${text}\nQuestion: ${q}`;
+      const hist = history.map(h => `${h.who === 'user' ? 'User' : 'Assistant'}: ${h.text}`).join('\n');
+      let prompt = `Answer the question using only the article below.\nArticle:\n${text}`;
+      if (hist) prompt += `\n${hist}`;
+      prompt += `\nUser: ${q}`;
       let out;
       try {
         out = await window.api.ollamaQuery({ model, prompt });
@@ -1084,6 +1120,7 @@ async function showSummary() {
         return;
       }
       chat.lastChild.innerHTML = parseMarkdown(out.trim());
+      history.push({ who: 'ai', text: out.trim() });
     };
     qInput.onkeypress = (e) => {
       if (e.key === 'Enter') document.getElementById('sumAsk').click();

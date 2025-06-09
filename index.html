@@ -412,12 +412,19 @@
       max-width: 400px;
     }
 
+    #aiContent {
+      max-width: 1200px;
+      width: 95%;
+    }
+
     .reader {
       max-height: 80vh;
       width: 100%;
+      max-width: 800px;
       margin: 0 auto;
+      padding: 0 10px;
       overflow: auto;
-      line-height: 1.6;
+      line-height: 1.7;
       font-size: 18px;
       color: inherit;
     }
@@ -427,11 +434,42 @@
       background: transparent !important;
     }
 
+    .reader img {
+      width: 100%;
+      height: auto;
+      margin-bottom: 12px;
+      border-radius: 8px;
+    }
+
+    .reader blockquote {
+      margin: 1em 0;
+      padding-left: 1em;
+      border-left: 4px solid rgba(0,0,0,0.2);
+    }
+
+    .reader h1,
+    .reader h2,
+    .reader h3 {
+      margin-top: 1.2em;
+      margin-bottom: 0.6em;
+    }
+
+    .reader p {
+      margin-bottom: 1em;
+    }
+
+    .reader pre {
+      background: rgba(0,0,0,0.05);
+      padding: 8px;
+      overflow: auto;
+      border-radius: 6px;
+    }
+
     .chat {
       display: flex;
       flex-direction: column;
       gap: 6px;
-      max-height: 200px;
+      max-height: 400px;
       overflow: auto;
       margin-bottom: 8px;
     }
