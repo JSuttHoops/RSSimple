@@ -16,6 +16,7 @@ const modalContent = document.getElementById('modalContent');
 const readerBar = document.getElementById('readerBar');
 const toggleReader = document.getElementById('toggleReader');
 const webModeBtn = document.getElementById('webMode');
+const summaryBtn = document.getElementById('summaryBtn');
 const fontSelect = document.getElementById('fontSelect');
 const bgColor = document.getElementById('bgColor');
 const allFeedsBtn = document.getElementById('allFeeds');
@@ -65,6 +66,7 @@ let searchText = '';
 let rangeDays = 7;
 let currentFeed = '*';
 let currentArticles = [];
+let currentArticle = null;
 let podcastMode = false;
 let currentPodcast = null;
 let currentEpisodes = [];
@@ -571,6 +573,7 @@ function renderAiArticles(el, list) {
 }
 
 async function showArticle(a) {
+  currentArticle = a;
   let raw = a.content;
   if (!raw) {
     try {
@@ -842,7 +845,7 @@ async function showAiSearch() {
         return `${i + 1}. "${a.title}"${meta ? ` (${meta})` : ''}`;
       }).join('\n');
       const prompt =
-        `You are a search assistant. Focus mainly on matching the article titles to the question. Below is a numbered list of articles. Reply with a comma-separated list of the numbers that best answer the question or "none".\nArticles:\n${docs}\nQuestion: ${query}`;
+        `You are a search assistant. Ignore any earlier questions and focus solely on the query below. Match the article titles to it and reply with a comma-separated list of the numbers that best answer the question or "none".\nArticles:\n${docs}\nQuestion: ${query}`;
       const resultEl = document.getElementById('aiResult');
       resultEl.textContent = 'Thinking...';
       const out = await window.api.ollamaQuery({ model, prompt });
@@ -855,6 +858,60 @@ async function showAiSearch() {
       }
     };
     document.getElementById('aiQuery').focus();
+  });
+}
+
+async function showSummary() {
+  if (!currentArticle) return;
+  const readerDiv = modalContent.querySelector('.reader');
+  if (!readerDiv) return;
+  const text = readerDiv.innerText.slice(0, 8000);
+  return new Promise(async (res) => {
+    aiContent.innerHTML = `<div>` +
+      `<div style="margin-bottom:8px;">Model: <select id="sumModel"></select></div>` +
+      `<div style="display:flex;gap:6px;margin-bottom:8px;">` +
+      `<button id="sumDo">Summarize</button><button id="sumClose">Close</button>` +
+      `</div>` +
+      `<textarea id="sumOut" style="width:100%;height:150px;margin-bottom:8px;" readonly></textarea>` +
+      `<input id="sumQuery" style="width:100%;margin-bottom:8px;" placeholder="Ask about the article"/>` +
+      `<button id="sumAsk">Ask</button>` +
+      `<div style="font-size:12px;margin-top:6px;opacity:0.7;">Ensure Ollama is running. Lightweight models like llama3 or phi3 are recommended.</div>` +
+      `</div>`;
+    aiModal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    const models = await window.api.listOllamaModels();
+    const sel = document.getElementById('sumModel');
+    models.forEach(m => {
+      const o = document.createElement('option');
+      o.value = m;
+      o.textContent = m;
+      sel.appendChild(o);
+    });
+    const outEl = document.getElementById('sumOut');
+    const close = () => {
+      aiModal.style.display = 'none';
+      document.body.style.overflow = '';
+      res();
+    };
+    document.getElementById('sumClose').onclick = close;
+    aiModal.onclick = close;
+    aiContent.onclick = (e) => e.stopPropagation();
+    document.getElementById('sumDo').onclick = async () => {
+      outEl.value = 'Summarizing...';
+      const model = sel.value;
+      const prompt = `Summarize the article below in bullet points.\n${text}`;
+      const out = await window.api.ollamaQuery({ model, prompt });
+      outEl.value = out.trim();
+    };
+    document.getElementById('sumAsk').onclick = async () => {
+      const q = document.getElementById('sumQuery').value.trim();
+      if (!q) return;
+      outEl.value = 'Thinking...';
+      const model = sel.value;
+      const prompt = `Answer the question using only the article below.\nArticle:\n${text}\nQuestion: ${q}`;
+      const out = await window.api.ollamaQuery({ model, prompt });
+      outEl.value = out.trim();
+    };
   });
 }
 
@@ -901,6 +958,10 @@ webModeBtn.onclick = () => {
     webDiv.style.display = 'none';
     readerDiv.style.display = 'block';
   }
+};
+
+summaryBtn.onclick = () => {
+  showSummary();
 };
 
 async function downloadArticle(a) {
