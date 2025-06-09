@@ -853,7 +853,7 @@ async function showAiSearch() {
         return { a, idx, score };
       });
       scored.sort((x, y) => y.score - x.score);
-      const top = scored.slice(0, 200);
+      const top = scored.slice(0, 50);
       const docs = top.map(({ a }, i) => {
         const date = (a.isoDate || a.pubDate || '').slice(0, 10);
         const meta = [a.feedTitle, date].filter(Boolean).join(' ');
@@ -864,6 +864,11 @@ async function showAiSearch() {
       const resultEl = document.getElementById('aiResult');
       resultEl.textContent = 'Thinking...';
       const out = await window.api.ollamaQuery({ model, prompt });
+      if (/^Error:/i.test(out.trim())) {
+        resultEl.textContent = out.trim();
+        window.api.logAiSearch({ query, results: out.trim() });
+        return;
+      }
       const firstLine = out.trim().split(/\n/)[0];
       const nums =
         /none/i.test(firstLine)
