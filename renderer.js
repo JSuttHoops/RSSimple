@@ -86,6 +86,7 @@ let currentEpisodes = [];
 let newsMode = false;
 
 let saveTimer = null;
+let lazyObserver = null;
 function scheduleSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
@@ -137,6 +138,44 @@ function renderSpinner(el) {
 function clearSpinner(el) {
   const sp = el.querySelector('.spinner');
   if (sp) sp.remove();
+}
+
+function initLazyObserver() {
+  if (lazyObserver) lazyObserver.disconnect();
+  lazyObserver = new IntersectionObserver(handleLazy, { rootMargin: '50% 0px' });
+}
+
+function handleLazy(entries, obs) {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const el = entry.target;
+      obs.unobserve(el);
+      const item = el._item;
+      const img = el._img;
+      if (!item.image) {
+        fetchOgImage(item.link).then(src => {
+          if (src) {
+            item.image = src;
+            if (img) {
+              img.src = src;
+              img.style.display = '';
+            }
+            scheduleSave();
+          }
+        });
+      } else if (img && !img.src) {
+        img.src = item.image;
+        img.style.display = '';
+      }
+    }
+  });
+}
+
+function registerLazy(el, item, img) {
+  if (!lazyObserver) return;
+  el._item = item;
+  el._img = img;
+  lazyObserver.observe(el);
 }
 
 function renderError(el, msg) {
@@ -471,11 +510,18 @@ function renderEpisodes(list) {
   list.forEach(ep => {
     const div = document.createElement('div');
     div.className = 'article';
+    let img = null;
     if (ep.image) {
-      const img = document.createElement('img');
+      img = document.createElement('img');
       img.src = ep.image;
       img.loading = 'lazy';
       div.appendChild(img);
+    } else {
+      img = document.createElement('img');
+      img.loading = 'lazy';
+      img.style.display = 'none';
+      div.appendChild(img);
+      registerLazy(div, ep, img);
     }
     const title = document.createElement('div');
     const strong = document.createElement('strong');
@@ -542,11 +588,18 @@ function renderArticles(articles) {
     const div = document.createElement('div');
     div.className = 'article';
     if (state.read[a.link]) div.classList.add('read');
+    let img = null;
     if (a.image) {
-      const img = document.createElement('img');
+      img = document.createElement('img');
       img.src = a.image;
       img.loading = 'lazy';
       div.appendChild(img);
+    } else {
+      img = document.createElement('img');
+      img.loading = 'lazy';
+      img.style.display = 'none';
+      div.appendChild(img);
+      registerLazy(div, a, img);
     }
     const title = document.createElement('div');
     const strong = document.createElement('strong');
@@ -1368,11 +1421,13 @@ function fetchAny(url, controller) {
     .then(parseXML);
 }
 
-async function prefetchAll() {
-  articlesDiv.innerHTML = '<div class="spinner"></div>';
-  currentFeed = '*';
-  currentArticles = [];
-  setActiveFeedButton('*');
+async function prefetchAll(show = true) {
+  if (show) {
+    articlesDiv.innerHTML = '<div class="spinner"></div>';
+    currentFeed = '*';
+    currentArticles = [];
+    setActiveFeedButton('*');
+  }
   const timeline = [];
   const perFeed = {};
   const seen = new Set();
@@ -1395,8 +1450,10 @@ async function prefetchAll() {
         timeline.sort((a, b) => new Date(b.isoDate || b.pubDate || 0) - new Date(a.isoDate || a.pubDate || 0));
         state.articles[url] = res.items;
         state.articles['*'] = timeline;
-        currentArticles = timeline;
-        updateArticleDisplay();
+        if (show || currentFeed === '*') {
+          currentArticles = timeline;
+          updateArticleDisplay();
+        }
       })
       .catch(() => {});
   });
@@ -1417,9 +1474,7 @@ async function loadArticles(url) {
       if (result.feedTitle) {
         items.forEach(it => { it.feedTitle = result.feedTitle; });
       }
-      await Promise.all(items.slice(0, 10).map(async itm => {
-        if (!itm.image) itm.image = await fetchOgImage(itm.link);
-      }));
+      // preview images will be fetched lazily
       state.articles[url] = items;
       const feed = state.feeds.find(f => (f.url || f) === url);
       if (feed) {
@@ -1452,9 +1507,7 @@ async function loadEpisodes(url) {
       return;
     }
     items = result.items;
-    await Promise.all(items.slice(0, 5).map(async ep => {
-      if (!ep.image) ep.image = await fetchOgImage(ep.link);
-    }));
+    // episode images will be fetched lazily
     const pod = state.podcasts.find(p => p.url === url);
     if (pod) {
       if (result.feedTitle) pod.title = result.feedTitle;
@@ -1608,6 +1661,7 @@ opmlInput.onchange = async () => {
 };
 
 window.addEventListener('DOMContentLoaded', async () => {
+  initLazyObserver();
   const data = await window.api.loadData();
   state.feeds = normalizeFeeds(data.feeds || []);
   state.articles = data.articles || {};
@@ -1638,7 +1692,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     setActiveFeedButton('*');
   } else {
     loadArticles(def);
-    if (state.feeds.length) prefetchAll();
+    if (state.feeds.length) prefetchAll(false);
   }
 });
 
