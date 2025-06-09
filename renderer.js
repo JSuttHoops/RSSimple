@@ -15,8 +15,7 @@ const sinceDate = document.getElementById('sinceDate');
 const modal = document.getElementById('modal');
 const modalContent = document.getElementById('modalContent');
 const readerBar = document.getElementById('readerBar');
-const toggleReader = document.getElementById('toggleReader');
-const webModeBtn = document.getElementById('webMode');
+const viewToggle = document.getElementById('viewToggle');
 const summaryBtn = document.getElementById('summaryBtn');
 const unsubBtn = document.getElementById('unsubBtn');
 const backBtn = document.getElementById('backBtn');
@@ -74,7 +73,6 @@ let state = {
   read: {}
 };
 let filterText = '';
-let readerMode = false;
 let webViewMode = false;
 let searchText = '';
 let rangeDays = 7;
@@ -898,12 +896,13 @@ async function showArticle(a) {
     document.body.style.overflow = '';
   };
   modalContent.onclick = (e) => e.stopPropagation();
-  readerMode = !!parsed;
   webViewMode = false;
+  viewToggle.textContent = 'Web View';
   const webview = modalContent.querySelector('#webContainer webview');
   webview.src = a.link;
   modalContent.querySelector('#webContainer').style.display = 'none';
   backBtn.style.display = 'none';
+  modalContent.appendChild(readerBar);
   state.read[a.link] = true;
   scheduleSave();
 }
@@ -917,6 +916,7 @@ function showWebLink(url) {
   webDiv.style.display = 'block';
   backBtn.style.display = 'inline-block';
   webViewMode = true;
+  viewToggle.textContent = 'Reader View';
 }
 
 function showOfflineItem(item) {
@@ -930,6 +930,7 @@ function showOfflineItem(item) {
   }
   modalContent.innerHTML =
     `<iframe src="file://${item.file}" style="width:100%;height:80vh;border:0"></iframe>`;
+  modalContent.appendChild(readerBar);
   modal.style.display = 'flex';
   document.body.style.overflow = 'hidden';
   modal.onclick = () => {
@@ -1239,18 +1240,7 @@ function applyReaderPrefs() {
   bgColor.value = bg;
 }
 
-toggleReader.onclick = async () => {
-  readerMode = !readerMode;
-  const readerDiv = modalContent.querySelector('.reader');
-  if (readerMode && readerDiv && readerDiv.dataset.raw) {
-    const parsed = await window.api.parseReader(readerDiv.dataset.link);
-    readerDiv.innerHTML = readerDiv.dataset.hero + parsed;
-  } else if (readerDiv) {
-    readerDiv.innerHTML = readerDiv.dataset.hero + readerDiv.dataset.raw;
-  }
-};
-
-webModeBtn.onclick = () => {
+viewToggle.onclick = () => {
   webViewMode = !webViewMode;
   const readerDiv = modalContent.querySelector('.reader');
   const webDiv = modalContent.querySelector('#webContainer');
@@ -1258,10 +1248,12 @@ webModeBtn.onclick = () => {
     webDiv.style.display = 'block';
     readerDiv.style.display = 'none';
     backBtn.style.display = 'inline-block';
+    viewToggle.textContent = 'Reader View';
   } else {
     webDiv.style.display = 'none';
     readerDiv.style.display = 'block';
     backBtn.style.display = 'none';
+    viewToggle.textContent = 'Web View';
   }
 };
 
@@ -1301,6 +1293,7 @@ backBtn.onclick = () => {
   readerDiv.style.display = 'block';
   backBtn.style.display = 'none';
   webViewMode = false;
+  viewToggle.textContent = 'Web View';
 };
 
 async function downloadArticle(a) {
@@ -1477,6 +1470,12 @@ async function fetchOgImage(url) {
 }
 
 let feedCtrl = null;
+let prefetchCtrls = [];
+
+function cancelPrefetch() {
+  prefetchCtrls.forEach(c => c.abort());
+  prefetchCtrls = [];
+}
 
 function fetchAny(url, controller) {
   let ctrl = controller;
@@ -1505,6 +1504,8 @@ function fetchAny(url, controller) {
 }
 
 async function prefetchAll(show = true) {
+  cancelPrefetch();
+  if (feedCtrl) feedCtrl.abort();
   if (show) {
     articlesDiv.innerHTML = '<div class="spinner"></div>';
     currentFeed = '*';
@@ -1521,6 +1522,7 @@ async function prefetchAll(show = true) {
       batch.map(feed => {
         const url = feed.url || feed;
         const ctrl = new AbortController();
+        prefetchCtrls.push(ctrl);
         return fetchAny(url, ctrl)
           .then(res => ({ feed, url, res }))
           .catch(() => ({ feed, url, res: null }));
@@ -1549,9 +1551,11 @@ async function prefetchAll(show = true) {
   }
   renderFeeds();
   scheduleSave();
+  prefetchCtrls = [];
 }
 
 async function loadArticles(url) {
+  cancelPrefetch();
   window.api.logMain({ type: 'loadArticles', url });
   renderSpinner(articlesDiv);
   state.feedWeights[url] = (state.feedWeights[url] || 0) + 1;
@@ -1827,12 +1831,14 @@ newsSearch.oninput = () => {
 };
 
 favoritesBtn.onclick = () => {
+  cancelPrefetch();
   currentFeed = 'favorites';
   currentArticles = state.favorites;
   updateArticleDisplay();
   setActiveFeedButton('favorites');
 };
 offlineBtn.onclick = () => {
+  cancelPrefetch();
   currentFeed = "offline";
   currentArticles = state.offline;
   updateArticleDisplay();
@@ -1840,6 +1846,7 @@ offlineBtn.onclick = () => {
 };
 
 favFeedsBtn.onclick = async () => {
+  cancelPrefetch();
   if (!state.favoriteFeeds.length) return;
   articlesDiv.innerHTML = '<div class="spinner"></div>';
   const list = state.feeds.filter(f => state.favoriteFeeds.includes(f.url || f));
