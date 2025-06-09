@@ -9,7 +9,8 @@ const parser = new RSSParser({
       ['itunes:image', 'itunesImage'],
       ['podcast:transcript', 'transcript']
     ]
-  }
+  },
+  timeout: 10000
 });
 const { JSDOM, VirtualConsole } = require('jsdom');
 const { Readability } = require('@mozilla/readability');
@@ -387,4 +388,11 @@ ipcMain.handle('add-font', (_e, filePath) => {
 ipcMain.handle('font-path', (_e, name) => {
   ensureFontDir();
   return path.join(FONT_DIR, name);
+});
+
+ipcMain.handle('remove-font', (_e, name) => {
+  ensureFontDir();
+  const file = path.join(FONT_DIR, name);
+  if (fs.existsSync(file)) fs.unlinkSync(file);
+  return true;
 });

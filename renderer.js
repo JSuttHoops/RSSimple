@@ -986,17 +986,55 @@ function addFontOption(name) {
   }
 }
 
+function removeFontOption(name) {
+  fontSelect.querySelectorAll('option').forEach(o => {
+    if (o.value === name) o.remove();
+  });
+  const setSel = document.getElementById('setFont');
+  if (setSel) {
+    setSel.querySelectorAll('option').forEach(o => {
+      if (o.value === name) o.remove();
+    });
+  }
+  const style = document.getElementById('font-' + name);
+  if (style) style.remove();
+}
+
 async function loadCustomFonts() {
   const fonts = state.prefs.fonts || [];
   for (const f of fonts) {
-    const file = await window.api.fontPath(f);
-    const base = f.replace(/\.[^/.]+$/, '');
-    if (!document.getElementById('font-' + base)) {
-      const style = document.createElement('style');
-      style.id = 'font-' + base;
-      style.textContent = `@font-face{font-family:'${base}';src:url('file://${file.replace(/\\/g,'/')}');}`;
-      document.head.appendChild(style);
-      addFontOption(base);
+    if (typeof f === 'string') {
+      const file = await window.api.fontPath(f);
+      const base = f.replace(/\.[^/.]+$/, '');
+      if (!document.getElementById('font-' + base)) {
+        const style = document.createElement('style');
+        style.id = 'font-' + base;
+        style.textContent = `@font-face{font-family:'${base}';src:url('file://${file.replace(/\\/g,'/')}');}`;
+        document.head.appendChild(style);
+        addFontOption(base);
+      }
+    } else if (f && typeof f === 'object') {
+      const base = f.name;
+      if (!document.getElementById('font-' + base)) {
+        const parts = [];
+        if (f.regular) {
+          const file = await window.api.fontPath(f.regular);
+          parts.push(`@font-face{font-family:'${base}';src:url('file://${file.replace(/\\/g,'/')}');font-weight:normal;font-style:normal;}`);
+        }
+        if (f.bold) {
+          const file = await window.api.fontPath(f.bold);
+          parts.push(`@font-face{font-family:'${base}';src:url('file://${file.replace(/\\/g,'/')}');font-weight:bold;font-style:normal;}`);
+        }
+        if (f.italic) {
+          const file = await window.api.fontPath(f.italic);
+          parts.push(`@font-face{font-family:'${base}';src:url('file://${file.replace(/\\/g,'/')}');font-weight:normal;font-style:italic;}`);
+        }
+        const style = document.createElement('style');
+        style.id = 'font-' + base;
+        style.textContent = parts.join('');
+        document.head.appendChild(style);
+        addFontOption(base);
+      }
     }
   }
 }
@@ -1902,7 +1940,7 @@ favFeedsBtn.onclick = async () => {
 
 settingsBtn.onclick = async () => {
   settingsContent.innerHTML = `<h3>Settings</h3>
-    <div>Font: <select id="setFont"><option value="sans-serif">Sans</option><option value="serif">Serif</option></select> <button id="uploadFontSettings" class="btn">Upload Font</button></div>
+    <div>Font: <select id="setFont"><option value="sans-serif">Sans</option><option value="serif">Serif</option></select> <button id="uploadFontSettings" class="btn">Upload Font</button> <button id="removeFontSettings" class="btn">Remove Font</button></div>
     <div>Background: <input type="color" id="setBg" value="${state.prefs.bg || '#ffffff'}"/></div>
     <div>Theme: <select id="themeSel"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></div>
     <div>Default Feed: <select id="defaultFeed"><option value="*">All Recent</option>${state.feeds.map(f => `<option value="${f.url}">${f.title || f.url}</option>`).join('')}</select></div>
@@ -1927,6 +1965,26 @@ settingsBtn.onclick = async () => {
   document.getElementById('uploadFontSettings').onclick = () => {
     fontFileInput.click();
   };
+  document.getElementById('removeFontSettings').onclick = async () => {
+    const name = document.getElementById('setFont').value;
+    const idx = (state.prefs.fonts || []).findIndex(f =>
+      typeof f === 'string' ? f.replace(/\.[^/.]+$/, '') === name : f.name === name
+    );
+    if (idx >= 0) {
+      const font = state.prefs.fonts[idx];
+      if (typeof font === 'string') {
+        await window.api.removeFont(font);
+      } else {
+        for (const k of ['regular', 'bold', 'italic']) {
+          if (font[k]) await window.api.removeFont(font[k]);
+        }
+      }
+      state.prefs.fonts.splice(idx, 1);
+      if (state.prefs.font === name) state.prefs.font = 'sans-serif';
+      removeFontOption(name);
+      scheduleSave();
+    }
+  };
   document.getElementById('closeSettings').onclick = () => {
     state.prefs.font = document.getElementById('setFont').value;
     state.prefs.bg = document.getElementById('setBg').value;
@@ -1946,11 +2004,23 @@ uploadFontBtn.onclick = () => {
 };
 
 fontFileInput.onchange = async () => {
-  const file = fontFileInput.files[0];
-  if (!file) return;
-  const name = await window.api.addFont(file.path);
+  const files = Array.from(fontFileInput.files);
+  if (!files.length) return;
+  const base = await showPrompt('Font name', 'MyFont');
+  if (!base) {
+    fontFileInput.value = '';
+    return;
+  }
+  const info = { name: base };
+  for (const f of files) {
+    const saved = await window.api.addFont(f.path);
+    const low = f.name.toLowerCase();
+    if (low.includes('bold')) info.bold = saved;
+    else if (low.includes('italic')) info.italic = saved;
+    else info.regular = saved;
+  }
   state.prefs.fonts = state.prefs.fonts || [];
-  if (!state.prefs.fonts.includes(name)) state.prefs.fonts.push(name);
+  state.prefs.fonts.push(info);
   await loadCustomFonts();
   scheduleSave();
   fontFileInput.value = '';
