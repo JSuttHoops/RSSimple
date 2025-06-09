@@ -12,10 +12,11 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@mozilla/readability": "^0.6.0",
     "electron": "^29.4.6",
     "fast-xml-parser": "^5.2.5",
-    "rss-parser": "^3.13.0",
     "jsdom": "^24.0.0",
-    "@mozilla/readability": "^0.6.0"
+    "marked": "^9.1.6",
+    "rss-parser": "^3.13.0"
   }
 }

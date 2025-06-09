@@ -862,16 +862,20 @@ async function showAiSearch() {
         /none/i.test(firstLine)
           ? []
           : (firstLine.match(/\b\d+\b/g) || []).map(n => parseInt(n, 10) - 1);
-      const results = nums.map(i => all[i]).filter(Boolean);
+      const results = nums.map(i => top[i]?.a).filter(Boolean);
       if (results.length) {
         renderAiArticles(resultEl, results);
       } else {
-        resultEl.textContent = out.trim();
+        resultEl.innerHTML = marked.parse(out.trim());
       }
       const titles = results.length ? results.map(r => r.title).join('; ') : out.trim();
       window.api.logAiSearch({ query, results: titles });
     };
-    document.getElementById('aiQuery').focus();
+    const qInput = document.getElementById('aiQuery');
+    qInput.onkeypress = (e) => {
+      if (e.key === 'Enter') document.getElementById('aiGo').click();
+    };
+    qInput.focus();
   });
 }
 
@@ -883,12 +887,13 @@ async function showSummary() {
   return new Promise(async (res) => {
     aiContent.innerHTML = `<div>` +
       `<div style="margin-bottom:8px;">Model: <select id="sumModel"></select></div>` +
+      `<div id="sumChat" class="chat"></div>` +
       `<div style="display:flex;gap:6px;margin-bottom:8px;">` +
-      `<button id="sumDo">Summarize</button><button id="sumClose">Close</button>` +
+      `<input id="sumQuery" style="flex:1;" placeholder="Ask about the article"/>` +
+      `<button id="sumAsk">Send</button>` +
+      `<button id="sumDo">Summarize</button>` +
+      `<button id="sumClose">Close</button>` +
       `</div>` +
-      `<textarea id="sumOut" style="width:100%;height:150px;margin-bottom:8px;" readonly></textarea>` +
-      `<input id="sumQuery" style="width:100%;margin-bottom:8px;" placeholder="Ask about the article"/>` +
-      `<button id="sumAsk">Ask</button>` +
       `<div style="font-size:12px;margin-top:6px;opacity:0.7;">Ensure Ollama is running. Lightweight models like llama3 or phi3 are recommended.</div>` +
       `</div>`;
     aiModal.style.display = 'flex';
@@ -901,7 +906,15 @@ async function showSummary() {
       o.textContent = m;
       sel.appendChild(o);
     });
-    const outEl = document.getElementById('sumOut');
+    const chat = document.getElementById('sumChat');
+    const qInput = document.getElementById('sumQuery');
+    const addMsg = (html, who) => {
+      const div = document.createElement('div');
+      div.className = `msg ${who}`;
+      div.innerHTML = html;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    };
     const close = () => {
       aiModal.style.display = 'none';
       document.body.style.overflow = '';
@@ -911,20 +924,25 @@ async function showSummary() {
     aiModal.onclick = close;
     aiContent.onclick = (e) => e.stopPropagation();
     document.getElementById('sumDo').onclick = async () => {
-      outEl.value = 'Summarizing...';
+      addMsg('Summarizing...', 'ai');
       const model = sel.value;
       const prompt = `Summarize the article below in bullet points.\n${text}`;
       const out = await window.api.ollamaQuery({ model, prompt });
-      outEl.value = out.trim();
+      chat.lastChild.innerHTML = marked.parse(out.trim());
     };
     document.getElementById('sumAsk').onclick = async () => {
-      const q = document.getElementById('sumQuery').value.trim();
+      const q = qInput.value.trim();
       if (!q) return;
-      outEl.value = 'Thinking...';
+      addMsg(sanitize(q), 'user');
+      qInput.value = '';
+      addMsg('Thinking...', 'ai');
       const model = sel.value;
       const prompt = `Answer the question using only the article below.\nArticle:\n${text}\nQuestion: ${q}`;
       const out = await window.api.ollamaQuery({ model, prompt });
-      outEl.value = out.trim();
+      chat.lastChild.innerHTML = marked.parse(out.trim());
+    };
+    qInput.onkeypress = (e) => {
+      if (e.key === 'Enter') document.getElementById('sumAsk').click();
     };
   });
 }
