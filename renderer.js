@@ -838,18 +838,30 @@ async function showAiSearch() {
         const start = Date.now() - 7 * 86400000;
         all = all.filter(a => new Date(a.isoDate || a.pubDate || 0).getTime() >= start);
       }
-      const docs = all.slice(0, 200).map((a, i) => {
+      const qWords = new Set(query.toLowerCase().split(/\W+/).filter(Boolean));
+      const scored = all.map((a, idx) => {
+        const tWords = new Set(a.title.toLowerCase().split(/\W+/).filter(Boolean));
+        let score = 0;
+        for (const w of tWords) if (qWords.has(w)) score++;
+        return { a, idx, score };
+      });
+      scored.sort((x, y) => y.score - x.score);
+      const top = scored.slice(0, 200);
+      const docs = top.map(({ a }, i) => {
         const date = (a.isoDate || a.pubDate || '').slice(0, 10);
-        const cats = (a.categories || []).join(', ');
-        const meta = [a.feedTitle, date, cats && `[${cats}]`].filter(Boolean).join(' ');
+        const meta = [a.feedTitle, date].filter(Boolean).join(' ');
         return `${i + 1}. "${a.title}"${meta ? ` (${meta})` : ''}`;
       }).join('\n');
       const prompt =
-        `You are a search assistant. Ignore any earlier questions and focus solely on the query below. Match the article titles to it and reply with a comma-separated list of the numbers that best answer the question or "none".\nArticles:\n${docs}\nQuestion: ${query}`;
+        `You are a search assistant. Ignore any earlier questions and focus solely on the query below. Choose the articles whose TITLES best match the question. Metadata is only for reference. Reply ONLY with a comma-separated list of the numbers that best answer the question or "none".\nArticles:\n${docs}\nQuestion: ${query}\nAnswer:`;
       const resultEl = document.getElementById('aiResult');
       resultEl.textContent = 'Thinking...';
       const out = await window.api.ollamaQuery({ model, prompt });
-      const nums = (out.match(/\d+/g) || []).map(n => parseInt(n, 10) - 1);
+      const firstLine = out.trim().split(/\n/)[0];
+      const nums =
+        /none/i.test(firstLine)
+          ? []
+          : (firstLine.match(/\b\d+\b/g) || []).map(n => parseInt(n, 10) - 1);
       const results = nums.map(i => all[i]).filter(Boolean);
       if (results.length) {
         renderAiArticles(resultEl, results);
