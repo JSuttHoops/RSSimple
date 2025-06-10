@@ -181,9 +181,33 @@ function normalizeFeeds(feeds) {
 }
 
 async function showAskSimpli() {
-  await prefetchAll(false);
+  let list = [];
+  if (currentFeed === '*') {
+    await prefetchAll(false);
+    list = state.articles['*'] || [];
+  } else if (currentFeed === 'favfeeds') {
+    if (!currentArticles.length) {
+      const feeds = state.feeds.filter(f => state.favoriteFeeds.includes(f.url || f));
+      const { timeline, perFeed } = await window.buildTimeline(
+        feeds,
+        url => fetchAny(url, new AbortController())
+      );
+      list = timeline;
+      Object.keys(perFeed).forEach(url => {
+        state.articles[url] = perFeed[url].items;
+      });
+    } else {
+      list = currentArticles;
+    }
+  } else if (currentFeed === 'favorites') {
+    list = state.favorites;
+  } else if (currentFeed === 'offline') {
+    list = state.offline;
+  } else {
+    await loadArticles(currentFeed);
+    list = state.articles[currentFeed] || [];
+  }
   const since = Date.now() - 86400000;
-  let list = Object.values(state.articles).flat();
   list = list.filter(a => {
     const d = new Date(a.isoDate || a.pubDate || 0).getTime();
     return d >= since;
@@ -1542,38 +1566,20 @@ async function prefetchAll(show = true) {
     currentArticles = [];
     setActiveFeedButton('*');
   }
-  const timeline = [];
-  const seen = new Set();
-  const feeds = state.feeds.slice();
-  const limit = 5;
-  while (feeds.length) {
-    const batch = feeds.splice(0, limit);
-    const results = await Promise.all(
-      batch.map(feed => {
-        const url = feed.url || feed;
-        const ctrl = new AbortController();
-        prefetchCtrls.push(ctrl);
-        return fetchAny(url, ctrl)
-          .then(res => ({ feed, url, res }))
-          .catch(() => ({ feed, url, res: null }));
-      })
-    );
-    results.forEach(({ feed, url, res }) => {
-      if (!res || res.error) return;
-      if (res.feedTitle && !feed.title) feed.title = res.feedTitle;
-      const items = res.items.slice(0, 50);
-      state.articles[url] = items;
-      items.forEach(item => {
-        if (res.feedTitle) item.feedTitle = res.feedTitle;
-        const id = item.guid || item.link;
-        if (!seen.has(id)) {
-          seen.add(id);
-          timeline.push(item);
-        }
-      });
-    });
-  }
-  timeline.sort((a, b) => new Date(b.isoDate || b.pubDate || 0) - new Date(a.isoDate || a.pubDate || 0));
+  const { timeline, perFeed } = await window.buildTimeline(
+    state.feeds.slice(),
+    url => {
+      const ctrl = new AbortController();
+      prefetchCtrls.push(ctrl);
+      return fetchAny(url, ctrl);
+    }
+  );
+  Object.keys(perFeed).forEach(url => {
+    const info = perFeed[url];
+    state.articles[url] = info.items;
+    const feed = state.feeds.find(f => (f.url || f) === url);
+    if (feed && info.image && !feed.image) feed.image = info.image;
+  });
   state.articles['*'] = timeline;
   if (currentFeed === '*') {
     currentArticles = timeline;
@@ -1875,7 +1881,19 @@ favFeedsBtn.onclick = async () => {
   if (!state.favoriteFeeds.length) return;
   articlesDiv.innerHTML = '<div class="spinner"></div>';
   const list = state.feeds.filter(f => state.favoriteFeeds.includes(f.url || f));
-  const { timeline } = await window.buildTimeline(list, url => fetchAny(url, new AbortController()));
+  const { timeline, perFeed } = await window.buildTimeline(
+    list,
+    url => {
+      const ctrl = new AbortController();
+      prefetchCtrls.push(ctrl);
+      return fetchAny(url, ctrl);
+    }
+  );
+  Object.keys(perFeed).forEach(url => {
+    state.articles[url] = perFeed[url].items;
+    const feed = state.feeds.find(f => (f.url || f) === url);
+    if (feed && perFeed[url].image && !feed.image) feed.image = perFeed[url].image;
+  });
   currentFeed = 'favfeeds';
   currentArticles = timeline;
   setActiveFeedButton('favfeeds');
