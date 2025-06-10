@@ -181,11 +181,15 @@ function normalizeFeeds(feeds) {
 }
 
 async function showAskSimpli() {
-  const today = new Date().toISOString().slice(0, 10);
+  await prefetchAll(false);
+  const since = Date.now() - 86400000;
   let list = Object.values(state.articles).flat();
-  list = list.filter(a => (a.isoDate || a.pubDate || '').startsWith(today));
+  list = list.filter(a => {
+    const d = new Date(a.isoDate || a.pubDate || 0).getTime();
+    return d >= since;
+  });
   if (!list.length) {
-    alert('No articles from today');
+    alert('No recent articles');
     return;
   }
   const text = list
