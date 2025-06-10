@@ -1562,10 +1562,10 @@ async function prefetchAll(show = true) {
   if (feedCtrl) feedCtrl.abort();
   if (show) {
     articlesDiv.innerHTML = '<div class="spinner"></div>';
-    currentFeed = '*';
-    currentArticles = [];
     setActiveFeedButton('*');
   }
+  currentFeed = '*';
+  currentArticles = [];
   const { timeline, perFeed } = await window.buildTimeline(
     state.feeds.slice(),
     url => {
@@ -1581,10 +1581,8 @@ async function prefetchAll(show = true) {
     if (feed && info.image && !feed.image) feed.image = info.image;
   });
   state.articles['*'] = timeline;
-  if (currentFeed === '*') {
-    currentArticles = timeline;
-    updateArticleDisplay();
-  }
+  currentArticles = timeline;
+  updateArticleDisplay();
   renderFeeds();
   scheduleSave();
   prefetchCtrls = [];
