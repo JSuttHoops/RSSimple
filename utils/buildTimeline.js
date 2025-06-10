@@ -7,9 +7,10 @@ function buildTimeline(feeds, fetchFn, opts = {}) {
       const url = feed.url || feed;
       const res = results[i];
       if (res.status === 'fulfilled' && !res.value.error) {
-        const { feedTitle, items } = res.value;
+        const { feedTitle, items, image } = res.value;
         if (feedTitle && !feed.title) feed.title = feedTitle;
-        perFeed[url] = items;
+        if (image && !feed.image) feed.image = image;
+        perFeed[url] = { items, image };
         for (const item of items) {
           if (feedTitle) item.feedTitle = feedTitle;
           timeline.push(item);
