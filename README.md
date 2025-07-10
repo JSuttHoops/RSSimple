@@ -24,12 +24,14 @@ Now includes a sidebar feed list with filtering and editable feed names.
 - Sidebar with feed filtering.
 - Edit feed titles inline.
 - Categorize feeds with custom tags.
+- Automatically tag all feeds using your chosen Ollama model with the **Auto Tag** button.
 - Feed names wrap automatically so long titles aren't cut off.
 - Delete feeds with the ✖ button.
 - Add new feeds manually.
 - Dropdown to quickly switch between feeds.
 - Dark mode that follows system preference.
 - Weighted feed sorting based on how often you open a feed.
+- Slower feeds move toward the bottom of the list as their load time is measured.
 - "All Recent" tab aggregates articles from the past week.
 - Feeds only load when selected or refreshed, so the app doesn't fetch on startup.
 - Reader mode with adjustable font and background color.
@@ -47,6 +49,9 @@ Now includes a sidebar feed list with filtering and editable feed names.
 - Organise feeds visually in the News Library with custom logos.
 - "Ask Simpli" dialog with optional web search via SearxNG and Ollama models.
 - SearxNG instance can be changed in the Settings panel.
+- Refresh feeds quietly in the background so the "All Recent" feed no longer steals focus.
+- Click **Refresh Feed** to reload only the current feed.
+- RSSimple automatically refreshes all feeds every 30 minutes.
 
 ## Ask Simpli
 

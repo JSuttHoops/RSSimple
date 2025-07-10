@@ -93,6 +93,7 @@ function loadData() {
     if (!data.prefs) data.prefs = { fonts: [] };
     if (!data.prefs.fonts) data.prefs.fonts = [];
     if (!data.prefs.searx) data.prefs.searx = DEFAULT_SEARX;
+    if (!data.fetchTimes) data.fetchTimes = {};
     data.feeds = data.feeds.map(f => {
       if (typeof f === 'string') return { url: f, title: '', tags: [] };
       if (!f.tags) f.tags = [];
@@ -106,7 +107,7 @@ function loadData() {
     }
     return data;
   } catch (e) {
-    const empty = { feeds: [], articles: {}, feedWeights: {}, favorites: [], favoriteFeeds: [], prefs: { fonts: [], searx: DEFAULT_SEARX }, podcasts: [], episodes: {}, offline: [], read: {} };
+    const empty = { feeds: [], articles: {}, feedWeights: {}, fetchTimes: {}, favorites: [], favoriteFeeds: [], prefs: { fonts: [], searx: DEFAULT_SEARX }, podcasts: [], episodes: {}, offline: [], read: {} };
     if (fs.existsSync(OPML_FILE)) {
       const parsed = parseOPML(OPML_FILE);
       const map = new Map(parsed.map(f => [f.url, f]));
