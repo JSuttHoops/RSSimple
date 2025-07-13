@@ -26,6 +26,7 @@ const uploadFontBtn = document.getElementById('uploadFontBtn');
 const fontFileInput = document.getElementById('fontFile');
 const allFeedsBtn = document.getElementById('allFeeds');
 const refreshAllBtn = document.getElementById('refreshAll');
+const refreshFeedBtn = document.getElementById('refreshCurrent');
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsModal = document.getElementById('settingsModal');
 const settingsContent = document.getElementById('settingsContent');
@@ -33,6 +34,7 @@ const dialogModal = document.getElementById('dialogModal');
 const dialogContent = document.getElementById('dialogContent');
 const podcastLibBtn = document.getElementById('podcastLib');
 const newsLibBtn = document.getElementById('newsLib');
+const autoTagBtn = document.getElementById('autoTagBtn');
 const addPodcastBtn = document.getElementById('addPodcast');
 const podcastFeedsDiv = document.getElementById('podcastFeeds');
 const episodesDiv = document.getElementById('episodes');
@@ -55,6 +57,7 @@ let state = {
   feeds: [],
   articles: {},
   feedWeights: {},
+  fetchTimes: {},
   favorites: [],
   favoriteFeeds: [],
   prefs: {},
@@ -76,6 +79,7 @@ let currentEpisodes = [];
 let newsMode = false;
 
 let saveTimer = null;
+let refreshTimer = null;
 let lazyObserver = null;
 function scheduleSave() {
   clearTimeout(saveTimer);
@@ -98,6 +102,13 @@ function applyTheme() {
 
 function applyLayout() {
   document.body.dataset.layout = state.prefs.layout || 'sidebar';
+}
+
+function startAutoRefresh() {
+  clearInterval(refreshTimer);
+  refreshTimer = setInterval(() => {
+    prefetchAll(false);
+  }, 1800000);
 }
 
 function showPodcastMode(on) {
@@ -323,7 +334,11 @@ function renderFeeds() {
   const frag = document.createDocumentFragment();
   const feeds = state.feeds
     .slice()
-    .sort((a, b) => (state.feedWeights[b.url] || 0) - (state.feedWeights[a.url] || 0))
+    .sort((a, b) => {
+      const wDiff = (state.feedWeights[b.url] || 0) - (state.feedWeights[a.url] || 0);
+      if (wDiff) return wDiff;
+      return (state.fetchTimes[a.url] || Infinity) - (state.fetchTimes[b.url] || Infinity);
+    })
     .filter(f => {
       const url = f.url || f;
       const title = f.title || url;
@@ -1168,6 +1183,53 @@ function showFeedSearch() {
   });
 }
 
+async function autoTagFeeds() {
+  return new Promise(async (res) => {
+    aiContent.innerHTML = `<div>` +
+      `<div style="margin-bottom:8px;">Model: <select id="tagModel"></select></div>` +
+      `<div id="tagStatus" style="margin-bottom:8px;"></div>` +
+      `<div style="display:flex;gap:6px;">` +
+      `<button id="tagStart" class="btn">Start</button>` +
+      `<button id="tagClose" class="btn">Close</button>` +
+      `</div></div>`;
+    aiModal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    const models = await window.api.listOllamaModels();
+    const sel = document.getElementById('tagModel');
+    models.forEach(m => {
+      const o = document.createElement('option');
+      o.value = m;
+      o.textContent = m;
+      sel.appendChild(o);
+    });
+    const status = document.getElementById('tagStatus');
+    const close = () => {
+      aiModal.style.display = 'none';
+      document.body.style.overflow = '';
+      res();
+    };
+    document.getElementById('tagClose').onclick = close;
+    aiModal.onclick = close;
+    aiContent.onclick = (e) => e.stopPropagation();
+    document.getElementById('tagStart').onclick = async () => {
+      const model = sel.value;
+      for (const feed of state.feeds) {
+        status.textContent = 'Tagging ' + (feed.title || feed.url) + '...';
+        const prompt = `Provide 3 short comma separated tags for the RSS feed titled "${feed.title || feed.url}".`;
+        let out = '';
+        try {
+          out = await window.api.ollamaQuery({ model, prompt });
+        } catch {}
+        const tags = out.split(/[,\n]/).map(t => t.trim().toLowerCase()).filter(Boolean).slice(0, 3);
+        if (tags.length) feed.tags = tags;
+      }
+      status.textContent = 'Done';
+      scheduleSave();
+      renderFeeds();
+    };
+  });
+}
+
 /*
 async function showAiSearch() {
   // Modal-based AI search is deprecated.
@@ -1538,11 +1600,16 @@ function fetchAny(url, controller) {
     feedCtrl = new AbortController();
     ctrl = feedCtrl;
   }
+  const start = Date.now();
   if (url.startsWith('bsky:')) {
-    return window.api.fetchBluesky(url.slice(5));
+    return window.api.fetchBluesky(url.slice(5)).finally(() => {
+      state.fetchTimes[url] = Date.now() - start;
+    });
   }
   if (/^https?:/.test(url)) {
-    return window.api.fetchFeed(url);
+    return window.api.fetchFeed(url).finally(() => {
+      state.fetchTimes[url] = Date.now() - start;
+    });
   }
   return fetch(url, { signal: ctrl.signal })
     .then(res => {
@@ -1554,18 +1621,22 @@ function fetchAny(url, controller) {
       data.items.forEach(it => { it.feedUrl = url; });
       data.feedUrl = url;
       return data;
+    })
+    .finally(() => {
+      state.fetchTimes[url] = Date.now() - start;
     });
 }
 
 async function prefetchAll(show = true) {
   cancelPrefetch();
   if (feedCtrl) feedCtrl.abort();
+  const viewing = currentFeed === '*';
   if (show) {
     articlesDiv.innerHTML = '<div class="spinner"></div>';
     setActiveFeedButton('*');
+    currentFeed = '*';
+    currentArticles = [];
   }
-  currentFeed = '*';
-  currentArticles = [];
   const { timeline, perFeed } = await window.buildTimeline(
     state.feeds.slice(),
     url => {
@@ -1581,8 +1652,12 @@ async function prefetchAll(show = true) {
     if (feed && info.image && !feed.image) feed.image = info.image;
   });
   state.articles['*'] = timeline;
-  currentArticles = timeline;
-  updateArticleDisplay();
+  if (show || viewing) {
+    currentFeed = '*';
+    currentArticles = timeline;
+    updateArticleDisplay();
+    setActiveFeedButton('*');
+  }
   renderFeeds();
   scheduleSave();
   prefetchCtrls = [];
@@ -1800,6 +1875,7 @@ opmlInput.onchange = async () => {
     state.feeds = normalizeFeeds(data.feeds || []);
     state.articles = data.articles || {};
     state.feedWeights = data.feedWeights || {};
+    state.fetchTimes = data.fetchTimes || {};
     state.favorites = data.favorites || [];
     state.favoriteFeeds = data.favoriteFeeds || [];
     state.prefs = data.prefs || {};
@@ -1825,16 +1901,29 @@ opmlInput.onchange = async () => {
       updateArticleDisplay();
     }
     setActiveFeedButton(def);
+    startAutoRefresh();
   });
 
-allFeedsBtn.onclick = () => {
-  if (currentFeed !== '*' || !state.articles['*']) {
-    prefetchAll();
-  } else {
+function openRecent() {
+  cancelPrefetch();
+  if (state.articles['*']) {
     currentFeed = '*';
     currentArticles = state.articles['*'];
     updateArticleDisplay();
     setActiveFeedButton('*');
+    prefetchAll(false);
+  } else {
+    prefetchAll(true);
+  }
+}
+
+allFeedsBtn.onclick = openRecent;
+
+refreshFeedBtn.onclick = () => {
+  if (currentFeed && currentFeed !== '*') {
+    loadArticles(currentFeed);
+  } else {
+    openRecent();
   }
 };
 
@@ -1853,6 +1942,10 @@ newsLibBtn.onclick = () => {
 
 exploreBtn.onclick = () => {
   showFeedSearch();
+};
+
+autoTagBtn.onclick = () => {
+  autoTagFeeds();
 };
 
 newsSearch.oninput = () => {
